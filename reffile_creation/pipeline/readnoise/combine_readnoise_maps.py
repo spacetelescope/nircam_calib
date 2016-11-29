@@ -15,15 +15,6 @@ import numpy as np
 import argparse,os,sys
 import glob
 import copy
-
-# put the tools directory into the path
-# add pythonmodules to PATH
-if os.environ.has_key('JWSTTOOLS_ROOTDIR'):
-    sys.path.append(os.path.join(os.environ['JWSTTOOLS_ROOTDIR'],'pythonmodules'))
-else:
-    print 'ERROR: environment variable JWSTTOOLS_ROOTDIR is not set!'
-    sys.exit(0)
-
 from sigmacut import calcaverageclass
 
 class mean_readnoise():

@@ -9,7 +9,7 @@ filenamefull = 'NRCNRCB1-DARK-60090405201_1_486_SE_2016-01-09T05h33m56_uncal_hea
 filenamesub = 'NRCV82600012001P0000000002102_1_486_SE_2016-01-18T04h25m10_uncal_sliced_slp_assign_wcs.fits'  #subarray
 #rawsubfile = 'NRCV82600012001P0000000002102_1_486_SE_2016-01-18T04h25m10.fits'
 
-from jwst_lib import models
+from jwst import datamodels as models
 import numpy as np
 from astropy.io import fits
 import matplotlib.pyplot as plt

@@ -7,15 +7,6 @@ import scipy
 from astropy.io import fits as pyfits
 import numpy as np
 import optparse
-
-# put the tools directory into the path
-# add pythonmodules to PATH
-if os.environ.has_key('JWSTTOOLS_ROOTDIR'):
-    sys.path.append(os.path.join(os.environ['JWSTTOOLS_ROOTDIR'],'pythonmodules'))
-else:
-    print 'ERROR: environment variable JWSTTOOLS_ROOTDIR is not set!'
-    sys.exit(0)
-
 from tools import rmfile
 
 class sliceimclass:

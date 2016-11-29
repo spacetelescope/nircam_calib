@@ -23,14 +23,14 @@ import matplotlib.pyplot as plt
 
 # put the tools directory into the path
 # add pythonmodules to PATH
-if os.environ.has_key('JWSTTOOLS_ROOTDIR'):
-    sys.path.append(os.path.join(os.environ['JWSTTOOLS_ROOTDIR'],'pythonmodules'))
-else:
-    print 'ERROR: environment variable JWSTTOOLS_ROOTDIR is not set!'
-    sys.exit(0)
+#if os.environ.has_key('JWSTTOOLS_ROOTDIR'):
+#    sys.path.append(os.path.join(os.environ['JWSTTOOLS_ROOTDIR'],'pythonmodules'))
+#else:
+#    print 'ERROR: environment variable JWSTTOOLS_ROOTDIR is not set!'
+#    sys.exit(0)
 
 from sigmacut import calcaverageclass
-from jwst_lib.models import DarkModel,MaskModel,dqflags
+from jwst.datamodels import DarkModel,MaskModel,dqflags
 
 
 class make_nrc_dark_reffile():

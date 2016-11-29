@@ -7,19 +7,10 @@ creating the superbias
 '''
 
 from multiprocessing import Pool
-from jwst_pipeline.dq_init import DQInitStep
-from jwst_pipeline.saturation import SaturationStep
+from jwst.dq_init import DQInitStep
+from jwst.saturation import SaturationStep
 import glob,argparse,os,sys
 from astropy.io import fits
-
-# put the tools directory into the path
-# add pythonmodules to PATH
-if os.environ.has_key('JWSTTOOLS_ROOTDIR'):
-    sys.path.append(os.path.join(os.environ['JWSTTOOLS_ROOTDIR'],'pythonmodules'))
-else:
-    print 'ERROR: environment variable JWSTTOOLS_ROOTDIR is not set!'
-    sys.exit(0)
-
 from refpixcorr_g0 import refpix_g0
 
 

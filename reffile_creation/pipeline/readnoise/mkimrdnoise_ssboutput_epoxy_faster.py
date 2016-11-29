@@ -11,20 +11,11 @@ import math
 import datetime, glob
 import copy
 from itertools import izip
-
-# put the tools directory into the path
-# add pythonmodules to PATH
-if os.environ.has_key('JWSTTOOLS_ROOTDIR'):
-    sys.path.append(os.path.join(os.environ['JWSTTOOLS_ROOTDIR'],'pythonmodules'))
-else:
-    print 'ERROR: environment variable JWSTTOOLS_ROOTDIR is not set!'
-    sys.exit(0)
-
 from sigmacut import calcaverageclass
 from texttable import txttableclass
 from tools import rmfile
 from nircam2ssb import nircam2ssbclass
-from jwst_lib import models
+from jwst import datamodels as models
 #nircam_read import NRC_RampModel
 
 lowedir = '/grp/jwst/wit/nircam/hilbert/epoxy_thinned_area_definition/'

@@ -6,13 +6,13 @@
 import glob
 import numpy as np
 #import sci2ssb
-from jwst_pipeline.pipeline import SloperPipeline
+from jwst.pipeline import SloperPipeline
 from astropy.table import Table
 import argparse
 from itertools import izip
 from datetime import datetime
 from astropy.io import fits
-from jwst_pipeline.flatfield import FlatFieldStep
+from jwst.flatfield import FlatFieldStep
 
 datadir = 'ifs/jwst/wit/nircam/isim_cv3_files_for_calibrations/'
 config_dict = {'A1':'','A2':'','A3':'','A4':'','ALONG':'','B1':'','B2':'','B3':'','B4':'','BLONG':''}

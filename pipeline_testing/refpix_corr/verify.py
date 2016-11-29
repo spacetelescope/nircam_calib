@@ -9,11 +9,6 @@ from astropy.io import fits
 import copy,os,sys
 from astropy.convolution import convolve, Box1DKernel, Box2DKernel
 import matplotlib.pyplot as plt
-if os.environ.has_key('JWSTTOOLS_ROOTDIR'):
-    sys.path.append(os.path.join(os.environ['JWSTTOOLS_ROOTDIR'],'pythonmodules'))
-else:
-    print 'ERROR: environment variable JWSTTOOLS_ROOTDIR is not set!'
-    sys.exit(0)
 import sigmacut
 
 #frame numbers to extract and use in the testing

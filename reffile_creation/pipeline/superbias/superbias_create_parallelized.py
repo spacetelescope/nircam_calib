@@ -21,18 +21,8 @@ import copy,sys,glob
 import subprocess
 from jwst_lib.models import SuperBiasModel
 #sys.path.append('/user/hilbert/detector_test/python_procs/nircam/utils/')
-from jwst_lib.models import dqflags
-from jwst_pipeline.ipc import IPCStep
-
-# put the tools directory into the path
-# add pythonmodules to PATH
-if os.environ.has_key('JWSTTOOLS_ROOTDIR'):
-    sys.path.append(os.path.join(os.environ['JWSTTOOLS_ROOTDIR'],'pythonmodules'))
-else:
-    print 'ERROR: environment variable JWSTTOOLS_ROOTDIR is not set!'
-    sys.exit(0)
-
-
+from jwst.datamodels import dqflags
+from jwst.ipc import IPCStep
 import sigmacut
 
 #qstart = [0,510,1020,1530,2040]

@@ -1,10 +1,10 @@
 #! /usr/bin/env python
 
-from jwst_lib.models import RampModel
-from jwst_pipeline.superbias import SuperBiasStep
-from jwst_pipeline.refpix import RefPixStep
-from jwst_pipeline.linearity import LinearityStep
-from jwst_pipeline.jump import JumpStep
+from jwst.datamodels import RampModel
+from jwst.superbias import SuperBiasStep
+from jwst.refpix import RefPixStep
+from jwst.linearity import LinearityStep
+from jwst.jump import JumpStep
 
 
 

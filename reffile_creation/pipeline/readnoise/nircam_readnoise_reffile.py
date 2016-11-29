@@ -6,17 +6,8 @@ import numpy as np
 import argparse,subprocess
 import subprocess
 import datetime
-
-# put the tools directory into the path
-# add pythonmodules to PATH
-if os.environ.has_key('JWSTTOOLS_ROOTDIR'):
-    sys.path.append(os.path.join(os.environ['JWSTTOOLS_ROOTDIR'],'pythonmodules'))
-else:
-    print 'ERROR: environment variable JWSTTOOLS_ROOTDIR is not set!'
-    sys.exit(0)
-
 from multiprocessing import Pool
-from jwst_lib.models import ReadnoiseModel
+from jwst.datamodels import ReadnoiseModel
 import mkimrdnoise_ssboutput_epoxy_faster as ron_calc
 
 

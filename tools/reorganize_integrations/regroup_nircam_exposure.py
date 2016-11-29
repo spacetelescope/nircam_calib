@@ -9,15 +9,7 @@ import sys, os,re, copy
 import numpy as np
 import argparse
 from itertools import izip
-from jwst_lib.models import RampModel
-
-# put the tools directory into the path
-# add pythonmodules to PATH
-if os.environ.has_key('JWSTTOOLS_ROOTDIR'):
-    sys.path.append(os.path.join(os.environ['JWSTTOOLS_ROOTDIR'],'pythonmodules'))
-else:
-    print 'ERROR: environment variable JWSTTOOLS_ROOTDIR is not set!'
-    sys.exit(0)
+from jwst.datamodels import RampModel
 
 
 #dictionary of NIRCam readout patterns

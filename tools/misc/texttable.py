@@ -1,6 +1,16 @@
 #!/usr/bin/env python
 
 import re,sys,string,math,os,types,time
+
+# put the tools directory into the path
+# add pythonmodules to PATH
+if os.environ.has_key('JWSTTOOLS_ROOTDIR'):
+    sys.path.append(os.path.join(os.environ['JWSTTOOLS_ROOTDIR'],'pythonmodules'))
+else:
+    print 'ERROR: environment variable JWSTTOOLS_ROOTDIR is not set!'
+    sys.exit(0)
+
+
 import tools
 import spline
 import numpy

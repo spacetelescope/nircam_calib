@@ -9,7 +9,7 @@ from astropy.io import fits as pyfits
 from jwst_lib import models
 import numpy as np 
 
-sys.path.append(os.environ['UAZCONVDIR'])
+#sys.path.append(os.environ['UAZCONVDIR'])
 from nircam2ssb import nircam2ssbclass
 
 class sci2ssbclass(nircam2ssbclass):

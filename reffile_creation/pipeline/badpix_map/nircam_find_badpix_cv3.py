@@ -27,7 +27,6 @@ weird == nonlinear in lin reffile?? not really. they are only nonlinear above a 
 import numpy as np
 import sys
 from astropy.io import fits,ascii
-sys.path.append('/user/hilbert/detector_test/python_procs/nircam/utils/')
 import sigmacut
 import argparse
 import datetime,os
@@ -35,13 +34,13 @@ from itertools import izip
 import even_odd_correct
 import matplotlib.pyplot as plt
 from astropy.table import Table,Column,vstack
-from jwst_lib.models import MaskModel,dqflags
+from jwst.datamodels import MaskModel,dqflags
 import subprocess
 
 #qstart = [0,508,1020,1532,2040]
 qstart = [4,512,1024,1536,2044]
 
-lindir = '/grp/jwst/wit/nircam/CV2_reffile_delivery_v1/Linearity_delivery/'
+lindir = '/ifs/jwst/wit/witserv/data7/nrc/reference_files/SSB/CV3/cv3_reffile_conversion/linearity/'
 
 class Badpix_Map:
     def __init__(self):

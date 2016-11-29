@@ -4,15 +4,6 @@ import numpy as np
 from astropy.io import fits
 import os,sys,argparse
 from jwst_lib.models import SuperBiasModel
-
-# put the tools directory into the path
-# add pythonmodules to PATH
-if os.environ.has_key('JWSTTOOLS_ROOTDIR'):
-    sys.path.append(os.path.join(os.environ['JWSTTOOLS_ROOTDIR'],'pythonmodules'))
-else:
-    print 'ERROR: environment variable JWSTTOOLS_ROOTDIR is not set!'
-    sys.exit(0)
-
 from sigmacut import calcaverageclass
 
 

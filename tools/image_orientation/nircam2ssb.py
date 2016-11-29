@@ -5,7 +5,7 @@
 
 import sys, os,re,math
 import optparse,scipy
-from jwst_lib import models
+import jwst.datamodels as models
 from astropy.io import fits as pyfits
 
 
