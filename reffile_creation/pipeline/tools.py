@@ -109,7 +109,7 @@ class yamlcfgclass:
                 
         return(errorflag)
     
-    def setval_nosection(self,param,val,allflag=True,requireParamExists=True):
+    def setval_all(self,param,val,allflag=True,requireParamExists=True):
         foundflag=False
 
         # contains the string to be loaded. We use the yaml.load(string) function so that integers and floats are correctly converted!
@@ -142,14 +142,14 @@ class yamlcfgclass:
             errorflag = self.addnewparams(newparams,requireParamExists=requireParamExists)
             return(errorflag)
 
-    def setvals_nosection(self,param_val_list,allflag=True,requireParamExists=True):
+    def setvals_all(self,param_val_list,allflag=True,requireParamExists=True):
         if param_val_list == None: return(0)
         errorflag = False
         for (param,val) in param_val_list:
-            errorflag |= self.setval_nosection(param,val,allflag=allflag,requireParamExists=requireParamExists)
+            errorflag |= self.setval_all(param,val,allflag=allflag,requireParamExists=requireParamExists)
         return(errorflag)
 
-    def setvals(self,section_param_val_list,requireParamExists=True):
+    def setvals_section(self,section_param_val_list,requireParamExists=True):
 
         if section_param_val_list==None or len(section_param_val_list)==0:
             return(0)
@@ -159,6 +159,31 @@ class yamlcfgclass:
         # add all section,param,val tuples to the parameter string
         for (section,param,val) in section_param_val_list:
             paramstring = '%s:\n    %s: %s\n' % (section,param,val)
+
+            # get the new parameters
+            newparams = yaml.load(paramstring)
+
+            # check and add them
+            errorflag |= self.addnewparams(newparams,requireParamExists=requireParamExists)
+
+        # make sure the parameters already exist
+        # errorflag = self.checknewparams(newparams,requireParamExists=requireParamExists)
+
+        if errorflag:
+            print '!!! There are errors when setting the config parameters !!!!!'
+            
+        return(errorflag)
+    
+    def setvals(self,param_val_list,requireParamExists=True):
+
+        if param_val_list==None or len(param_val_list)==0:
+            return(0)
+
+        errorflag=False
+        
+        # add all section,param,val tuples to the parameter string
+        for (param,val) in param_val_list:
+            paramstring = '%s: %s\n' % (param,val)
 
             # get the new parameters
             newparams = yaml.load(paramstring)
@@ -191,7 +216,7 @@ class yamlcfgclass:
             print '!!! There are errors in the config file %s !!!!!' % filename
         return(errorflag)
 
-    def loadcfgfiles(self,maincfgfile,extracfgfiles=None,params=None,params4sections=None,requireParamExists=True,verbose=0):
+    def loadcfgfiles(self,maincfgfile,extracfgfiles=None,params=None,params4all=None,params4sections=None,requireParamExists=True,verbose=0):
         if maincfgfile==None:
             raise RuntimeError,"Main config file is not specified!"        
 
@@ -217,8 +242,9 @@ class yamlcfgclass:
                 return(1)
 
         # change the configs based on -p and --pp options
-        self.setvals_nosection(params,requireParamExists=requireParamExists)
-        self.setvals(params4sections,requireParamExists=requireParamExists)        
+        self.setvals(params,requireParamExists=requireParamExists)
+        self.setvals_all(params4all,requireParamExists=requireParamExists)
+        self.setvals_section(params4sections,requireParamExists=requireParamExists)        
 
         # replace environment variables in the configs
         self.subenvvarplaceholder(self.params)
@@ -226,13 +252,14 @@ class yamlcfgclass:
         if self.errorflag:
             print '!!! There were errors when getting the config parameters!! !!!!!'
 
-        if verbose>2:
+        if verbose>4:
             print yaml.dump(self.params)
             
         return(self.errorflag)
 
     
 #http://docs.astropy.org/en/stable/table/index.html#astropy-table
+#table groups!! http://docs.astropy.org/en/stable/table/operations.html#table-operations
 class astrotableclass:
     def __init__(self):
         self.t = astropy.table.Table()

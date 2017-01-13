@@ -19,7 +19,14 @@ if 'JWST_MKREFS_SRCDIR' in os.environ:
 #    rootdir = os.path.dirname(os.path.realpath(__file__))
 
 from tools import astrotableclass,yamlcfgclass
+from mkref import mkrefclass
 
+class cmdsclass(astrotableclass):
+    def __init__(self):
+        astrotableclass.__init__(self)
+        
+        
+        
 class mkrefsclass(astrotableclass):
     def __init__(self):
         astrotableclass.__init__(self)
@@ -35,46 +42,25 @@ class mkrefsclass(astrotableclass):
         self.DDtable = astrotableclass()
         self.FFtable = astrotableclass()
         self.DDFFtable = astrotableclass()
-    
-    def add_options(self, parser=None, usage=None):
-        if parser == None:
-            parser = argparse.ArgumentParser(usage=usage)
-        parser.add_argument('--verbose', '-v', action='count')
-        parser.add_argument('-d','--debug',help="debug: do lou's phot", action='count')
 
-        parser.add_argument('-o','--outbasename', default=None,
-                            help='full output basename, e.g. for photometry table. Supercedes all other output options, e.g. --outrootdir and --outsubdir (default=%default)')
-        parser.add_argument('--outrootdir', default=None,
-                            help='output root directory. If not specified, then the directory of input fits file is used. (default=%default)')
-        parser.add_argument('--outsubdir', default=None,
-                            help='subdir added to the output root directory (default=%default)')
-        parser.add_argument('--addsuffix', default=None,
-                            help='suffix added to the output basename (default=%default)')
-        parser.add_argument('--detector2subdir',help="add instrument_detector as a subdir to output basename",action="store_true",default=False)
-        parser.add_argument('--propID2subdir',help="add propID as a subdir to output basename",action="store_true",default=False)
-        parser.add_argument('--visit2subdir',help="add visit as a subdir to output basename",action="store_true",default=False)
-
-        # options for config file
-        if 'JWST_MKREFS_CONFIGFILE' in os.environ and os.environ['JWST_MKREFS_CONFIGFILE']!='':
-            cfgfile = os.environ['JWST_MKREFS_CONFIGFILE']
-        else:
-            cfgfile = None
-        parser.add_argument('-c','--cfgfile', default=cfgfile,
-                            help='main config file. (default=%default)')
-        parser.add_argument('-e','--extracfgfile', action='append', default=None, 
-                            help='additional config file. These cfg files do not need to have all parameters. They overwrite the parameters in the main cfg file. (default=%default)')
-        parser.add_argument('-p', '--params', action='append', default=None, nargs=2,
-                            help='"param val": change parameters in config file (section independent) (default=%default)')
-        parser.add_argument('--pp', action='append', default=None, nargs=3,
-                            help='"section param val". change parameters in section of config file (default=%default)')
+        self.cmdtable = cmdsclass()
         
-        return parser
+    def define_options(self, parser=None, usage=None):
+        if parser == None:
+            parser = argparse.ArgumentParser(usage=usage, conflict_handler='resolve')
+        parser.add_argument("reftypes_and_imagelist",nargs='+',help="list of ref types to be done and image (or file patterns) lists")
+        parser.add_argument('-b','--batchmode',help="run the commands in batch mode (default=%(default)s)",action="store_true",default=False)
+        parser.add_argument('--onlyshow',help="only show what would be done, but don't do it... (default=%(default)s)",action="store_true",default=False)
 
-    def loadcfgfiles(self,maincfgfile,extracfgfiles=None,params=None,params4sections=None,requireParamExists=True):
+        mkref = mkrefclass()
+        parser = mkref.refoptions4mkrefs(parser=parser)
+        return(parser)
+        
+    def loadcfgfiles(self,maincfgfile,extracfgfiles=None,params=None,params4all=None,params4sections=None,requireParamExists=True):
         if self.cfg == None:
             self.cfg = yamlcfgclass()
         if self.cfg.loadcfgfiles(maincfgfile,extracfgfiles=extracfgfiles,
-                                 params=params,params4sections=params4sections,
+                                 params=params,params4all=params4all,params4sections=params4sections,
                                  requireParamExists=requireParamExists,verbose=self.verbose):
             raise RuntimeError,"Something went wrong when loading config files!"
         return(0)
@@ -108,6 +94,7 @@ class mkrefsclass(astrotableclass):
             else:
                 print 'WARNING: image type of image %s is unknown!'
         
+
     def getimageinfo(self,imagelist):
         
         #self.imtable['fitsfile'].format('%s')
@@ -144,13 +131,101 @@ class mkrefsclass(astrotableclass):
             print '### %d detectors:' % (len(self.detectors)),", ".join(self.detectors)
             if self.verbose>1:
                 print self.imtable.t
-        
 
+    def get_optional_arguments(self,args,sysargv):
+        fitspattern = re.compile('\.fits$')
+        
+        opt_arg_list = []
+        for i in xrange(1,len(sysargv)):
+            if sysargv[i] in args.reftypes_and_imagelist:
+                if sysargv[i] in self.reftypelist:
+                    print 'this is a reftype',sysargv[i]
+                else:
+                    # test if it is an image
+                    if not fitspattern.search(sysargv[i]):
+                        print 'not a fits file! filepattern?',sysargv[i]
+            else:
+                opt_arg_list.append(sysargv[i])
+        print 'optional arguments:',opt_arg_list
+        return(opt_arg_list)
+        
+    def getDlist(self,detector):
+        Dlist = list(self.darks[np.where(np.logical_and(self.darks['DETECTOR']==detector,np.logical_not(self.darks['skip'])))]['fitsfile'])
+        return(Dlist)
+    
+        
+    def get_inputimage_sets(self,reftype,detector):
+        imtypes = self.cfg.params[reftype]['imtypes']
+        imagesets = []
+        if imtypes == 'D':
+            imagesets = self.getDlist(detector)
+        else:
+            raise RuntimeError,"ERROR: imtypes=%s not yet implemented!"
+        return(imagesets)
+    
+    def cmds4mkref(self,optionalargs):
+
+        if self.verbose:
+            print '##################################\n### Constructing commands'
+
+        for reftype in self.reftypelist:
+
+            if self.verbose:
+                print '### Constructing %s commands' % reftype
+            counter=0
+            for detector in self.detectors:
+                inputimagesets = self.get_inputimage_sets(reftype,detector)
+                for inputimageset in inputimagesets:
+                    cmdargs = '%s' % reftype
+                    
+                    if type(inputimageset) is types.ListType:
+                        cmdargs+=' %s' % ' '.join(inputimageset)
+                    else:
+                        cmdargs+=' %s' % inputimageset
+                        
+                    cmdargs += ' '
+                    cmdargs += ' '.join(optionalargs)
+
+                    mkref = mkrefclass()
+                    mkref.mkref(cmdargs.split(),onlyinit=True)
+                    
+                    if len(self.cmdtable.t)==0:
+                        self.cmdtable.t['reftype']=np.array([reftype])
+                        self.cmdtable.t['detector']=detector
+                        self.cmdtable.t['outbasename']=None
+                        self.cmdtable.t['cmdargs']=cmdargs
+                    else:
+                        self.cmdtable.t.add_row({'reftype':reftype,'detector':detector,'outbasename':None,'cmdargs':cmdargs})
+                    counter+=1
+                print '%d %s commands for detector %s' % (counter,reftype,detector)
+        print '### in total, %d commands' % (len(self.cmdtable.t))
+        if self.verbose>1:
+            print 'Commands constructed:'
+            print self.cmdtable.t
+
+
+    def submitbatch(self):
+        print "### submitbatch: NOT YET IMPLEMENTED!!!"
+        
+    def mkrefloop(self):
+        for i in xrange(len(self.cmdtable.t)):
+            
+            print '### running mkref.py %s' % self.cmdtable.t['cmdargs'][i]
+            mkref = mkrefclass()
+            
+            mkref.mkref(self.cmdtable.t['cmdargs'][i].split())
+            
+    def combinerefs(self):
+        print "### combinerefs: NOT YET IMPLEMENTED!!!"
+        
+            
+    def overview(self):
+        print "### overview: NOT YET IMPLEMENTED!!!"
+        
 if __name__=='__main__':
 
     mkrefs=mkrefsclass()
-    parser = mkrefs.add_options()
-    parser.add_argument("reftypes_and_imagelist",nargs='+',help="list of ref types to be done and image (or file patterns) lists")
+    parser = mkrefs.define_options()
     args = parser.parse_args()
 
     # set verbose level
@@ -161,9 +236,21 @@ if __name__=='__main__':
     mkrefs.loadcfgfiles(args.cfgfile,
                         extracfgfiles=args.extracfgfile,
                         params=args.params,
+                        params4all=args.pall,
                         params4sections=args.pp)
 
-    
+    print mkrefs.cfg.params
     mkrefs.organize_inputfiles(args.reftypes_and_imagelist)
 
-    
+    optionalargs = mkrefs.get_optional_arguments(args,sys.argv)
+
+    mkrefs.cmds4mkref(optionalargs)
+
+    if args.batchmode:
+        mkrefs.submitbatch()
+    else:
+        mkrefs.mkrefloop()
+
+    mkrefs.combinerefs()
+
+    mkrefs.overview()
