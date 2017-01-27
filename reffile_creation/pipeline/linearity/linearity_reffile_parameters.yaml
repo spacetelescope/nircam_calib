@@ -1,4 +1,4 @@
-dInputs:
+Inputs:
   infile: files.list                          # List of files to average for coefficients
   array_bounds: [0, 0, 2048, 2048  ]         # Coords of subarray corners (xstart, ystart, xend, yend)
   first_frame: 1                             # 0 or 1: 0 to include zero frame, 1 to exclude zero frame
