@@ -101,8 +101,13 @@ class Throughput:
         #budget, as the reported throughput values are supposed to represent those at the
         #END of the mission lifetime. --> from Marcia, via Stansberry, in 10 Feb 2016 email.
         #So, include the 0.98 factor here.
-        sw_optics = nvr_interp * collimator * sw_triplet * sw_mirrors * sw_particulates * 0.98
-        lw_optics = nvr_interp * collimator * lw_triplet * lw_mirrors * lw_particulates * 0.98
+
+        #Make a version of the files without the 0.98 factor. The optics file give to the ETC
+        #team does not contain this factor now. Marica mentioned that it is smaller than the
+        #uncertainty in some of the other inputs (QE) anyway. We had to update the ETC files
+        #anyway, so we removed the 0.98 factor there. Do it here also to be consistent.
+        sw_optics = nvr_interp * collimator * sw_triplet * sw_mirrors * sw_particulates #* 0.98
+        lw_optics = nvr_interp * collimator * lw_triplet * lw_mirrors * lw_particulates #* 0.98
 
         fo,ao = plt.subplots()
         ao.plot(wave,collimator,color='red',label='collimator')
