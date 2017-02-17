@@ -1,0 +1,42 @@
+Inputs:
+  infile: files.list                          # List of files to average for coefficients
+  array_bounds: [0, 0, 2048, 2048  ]         # Coords of subarray corners (xstart, ystart, xend, yend)
+  first_frame: 1                             # 0 or 1: 0 to include zero frame, 1 to exclude zero frame
+  input_check: False                         # True or False. If True, checks that all input files have same readpattern, array size, etc
+
+Uncertainty:
+  infile: None                               # Super ramp containing averaged data (1st extension) and uncertainties (2nd extension)
+  estimate: 64.0                             # If infile is None, use estimate: 64.0 = 8.**2, for unc = np.sqrt(readnoise*gain + signal)
+
+Saturation:
+  sigma_range: [20,60]                       # Range for standard deviation of signal differences early in the ramp (grps 20 to 60 out of 190)
+  limit: 3                                   # Saturation = 0 +/- limit*sigma
+
+Rampfit:
+  poly_order: 5                              # 4 or 5
+
+CorrectSignal:
+  poly_order: 5                              # 4 or 5
+  pipeline_coefs: 2                          # number of coefficients to auto add for the pipeline (first_coeff + second+coeff = 2)
+  first_coeff: 0.0                           # pipeline requires first coeff to be 0.0
+  second_coeff: 1.0                          # pipeline requires second coeff to be 1.0
+
+Softsat:
+  accuracy: 0.0034                           # Nonlinearity correction accuracy (correction residual st. dev, i.e. the soft saturation limit), e.g. 0.2% = 0.002",type=float
+  ramp_percent: 0.2                          # Maximum percentage of ramp to exclude to find soft saturation
+  corr_limit: 0.005                          # Residual standard deviation upper limit to flag pixels with poor corrections
+
+Output:
+  NRCA1: 17004
+  NRCA2: 17006
+  NRCA3: 17012
+  NRCA4: 17048
+  NRCALONG: 17158
+  NRCB1: 16991
+  NRCB2: 17005
+  NRCB3: 17011
+  NRCB4: 17047
+  NRCBLONG: 17161
+  coeffs: None                               # Coefficient reference file output name if not the default
+  saturation: saturation_limits.fits         # Name of file containing hard and soft saturation values
+  save_intermediates: True                   # Save intermediate products? (saturation file). Use True or False.
