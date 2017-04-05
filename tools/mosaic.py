@@ -14,24 +14,34 @@ __all__ = ['NircamMosaic']
 
 
 class NircamMosaic(object):
-    """Class to handle NIRCAM mosaic.
+    """
+    Class to handle NIRCAM mosaic.
+
     Based on IDL script and its accompanying document at
-    https://confluence.stsci.edu/display/JWST/FPA+mosaic
+    https://confluence.stsci.edu/display/JWST/FPA+mosaic .
+    However, V3 is upside-down in that document, so actual
+    detector layout follows
+    https://jwst-docs.stsci.edu/display/JTI/NIRCam+Detectors .
+
     .. note:: Currently does not support WCS.
+
     Parameters
     ----------
     data_ext : int, tuple, or str
         Extension, as acceptable by :func:`astropy.io.fits.getdata`,
         of data to be mosaicked.
+
     sw_sca_size : int
         Output size of a single SCA in the SHORT channel
         in the mosaic. SCA of LONG channel will be
         automatically resized to twice this value.
+
     Examples
     --------
     >>> images = ['myimage1.fits', 'myimage2.fits', ...]
     >>> my_mosaic = NircamMosaic()
     >>> mosaiclist = my_mosaic.make_mosaic(images)
+
     """
     _sca_size = 2048  # Actual dimension of a detector in pixels
     _sca_gap = 187.5  # Actual gap size between SW detectors in pixels
@@ -47,6 +57,7 @@ class NircamMosaic(object):
         """Output size of a single SCA in the SHORT channel
         in the mosaic. SCA of LONG channel will be
         automatically resized to about twice this value.
+
         """
         return self._sw_sca_size
 
@@ -84,13 +95,13 @@ class NircamMosaic(object):
         """Mosaic position by detector or channel."""
         key = key.upper()
         if key in ('NRCA4', 'NRCB1'):
-            pos = 'lower_left'
-        elif key in ('NRCA2', 'NRCB3'):
-            pos = 'lower_right'
-        elif key in ('NRCA3', 'NRCB2'):
-            pos = 'upper_left'
-        elif key in ('NRCA1', 'NRCB4'):
             pos = 'upper_right'
+        elif key in ('NRCA2', 'NRCB3'):
+            pos = 'upper_left'
+        elif key in ('NRCA3', 'NRCB2'):
+            pos = 'lower_right'
+        elif key in ('NRCA1', 'NRCB4'):
+            pos = 'lower_left'
         elif key in ('NRCALONG', 'NRCBLONG'):
             pos = 'top'
         elif key == 'SHORT':
@@ -170,14 +181,17 @@ class NircamMosaic(object):
 
     def get_single_mosaic_array(self, images):
         """Construct mosaic from images that belong to the same dataset.
+
         Parameters
         ----------
         images : list
             List of filenames from the same dataset.
+
         Returns
         -------
         mosaic : ndarray
             Mosaic image.
+
         """
         # Separate Modules A and B, Channels SHORT and LONG
         mod_list = {}
@@ -216,29 +230,37 @@ class NircamMosaic(object):
     def make_mosaic(self, images, outpath='', outsuffix='mosaic',
                     clobber=False, debug=False):
         """Construct one mosaic for each dataset, for multiple datasets.
+
         Images are sorted into datasets by JWST naming convention,
         ``jw<PPPPP><OOO><VVV>_<GGSAA>_<EEEEE>_<detector>_<suffix>.fits``,
         where the ROOTNAME is defined as
         ``jw<PPPPP><OOO><VVV>_<GGSAA>_<EEEEE>``.
         Each mosaic is saved as ``ROOTNAME_<outsuffix>.fits``,
         a single-extension FITS image.
+
         Parameters
         ----------
         images : list
             List of filenames.
+
         outpath : str
             Output directory. If not given, it is the current
             working directory.
+
         outsuffix : str
             Output suffix.
+
         clobber : bool
             If `True`, overwrite existing mosaic file(s).
+
         debug : bool
             If `True`, print extra information to screen.
+
         Returns
         -------
         mosaiclist : list
             List of mosaic filenames.
+
         """
         # Separate different datasets
         root_list = {}
@@ -289,6 +311,7 @@ class NircamMosaic(object):
 def _insert_image(position, dat, mosaic):
     """Insert data into appropriate position in mosaic,
     which is modified in-place.
+
     """
     if position in ('lower_left', 'bottom', 'left'):
         x1 = 0
@@ -313,4 +336,4 @@ def _insert_image(position, dat, mosaic):
     else:
         raise ValueError('Invalid position ({0})'.format(position))
 
-mosaic[y1:y2, x1:x2] = dat
+    mosaic[y1:y2, x1:x2] = dat
