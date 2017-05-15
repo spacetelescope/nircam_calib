@@ -6,7 +6,7 @@
 import sys, os,re,math
 import optparse,scipy
 from astropy.io import fits as pyfits
-from jwst_lib import models
+import jwst.datamodels as models
 import numpy as np 
 
 #sys.path.append(os.environ['UAZCONVDIR'])
