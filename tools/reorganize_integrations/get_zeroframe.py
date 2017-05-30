@@ -39,7 +39,7 @@ class GetZeroframe:
         # grab zeroframe data and put it into model instance
         empty = np.zeros((1,1,2048,2048))
         with fits.open(simfile) as h:
-            zero = h[2].data
+            zero = h[5].data
 
         empty[0,:,:,:] = zero
         model.data = empty
@@ -50,7 +50,7 @@ class GetZeroframe:
         model.err = np.zeros((1,1,2048,2048))
 
         # save the unformatted zeroframe file
-        outname = 'zeroframe_delme_'+simfile
+        outname = 'zeroframe_'+simfile
         model.save(outname,clobber=True)
 
         return outname
@@ -87,7 +87,7 @@ class GetZeroframe:
         print('DETECTOR: '+str(bad_hdulist[0].header['DETECTOR']))
 
         # save out the formatted file
-        final_outname = outname[:-5]+"_properHeaders_delme.fits"
+        final_outname = outname[:-5]+"_properHeaders.fits"
         print('\nSaving final file: '+str(final_outname))
         bad_hdulist.writeto(final_outname,clobber=True)
 
