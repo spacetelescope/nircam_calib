@@ -39,7 +39,7 @@ class GetZeroframe:
         # grab zeroframe data and put it into model instance
         empty = np.zeros((1,1,2048,2048))
         with fits.open(simfile) as h:
-            zero = h[5].data
+            zero = h['ZEROFRAME'].data
 
         empty[0,:,:,:] = zero
         model.data = empty
@@ -85,6 +85,7 @@ class GetZeroframe:
         print('\nTesting header values...')
         print('TFRAME: '+str(bad_hdulist[0].header['TFRAME']))
         print('DETECTOR: '+str(bad_hdulist[0].header['DETECTOR']))
+        print('GROUPS: '+str(bad_hdulist[0].header['NGROUPS']))
 
         # save out the formatted file
         final_outname = outname[:-5]+"_properHeaders.fits"
