@@ -1,16 +1,19 @@
 #! /usr/bin/env python
 
-# This script converts the fits files from the NIRCam CRYO runs at Lockheed
+# This script converts the fits files from the NIRCam CRYO runs
 # into ssb-conform fits files.
 
 import sys, os,re,math
 import optparse,scipy
-import jwst.datamodels as models
+from jwst import datamodels as models
 from astropy.io import fits as pyfits
+import numpy as np
 
 
 
-    
+
+
+
 class nircam2ssbclass:
     def __init__(self):
         self.version = 1.0
@@ -50,7 +53,7 @@ class nircam2ssbclass:
                 self.part2mod[self.modApartIDs[i]]['detector']='NRCA'+str(i+1-10)
                 self.part2mod[self.modBpartIDs[i]]['channel']='SHORT'
                 self.part2mod[self.modBpartIDs[i]]['detector']='NRCB'+str(i+1-10)
-                
+
 
 
     def add_options(self, parser=None, usage=None):
@@ -119,14 +122,14 @@ class nircam2ssbclass:
                 self.outputmodel.meta.instrument.channel = 'LONG'
             else:
                 raise RuntimeError,'wrong DETECTOR=%s' % self.hdr['DETECTOR']
-            self.outputmodel.meta.instrument.detector = 'NRC%s%d' % (self.outputmodel.meta.instrument.module,self.hdr['SCA'])            
+            self.outputmodel.meta.instrument.detector = 'NRC%s%d' % (self.outputmodel.meta.instrument.module,self.hdr['SCA'])
 
-            print 'TEST!!!',self.outputmodel.meta.instrument.module,self.outputmodel.meta.instrument.channel,self.outputmodel.meta.instrument.detector        
+            print 'TEST!!!',self.outputmodel.meta.instrument.module,self.outputmodel.meta.instrument.channel,self.outputmodel.meta.instrument.detector
         elif runID=='TUCSON_PARTNUM':
             idInFilename = filename[0:5]
             self.outputmodel.meta.instrument.detector = self.part2mod[idInFilename]['detector']
             self.outputmodel.meta.instrument.channel = self.part2mod[idInFilename]['channel']
-            self.outputmodel.meta.instrument.module = self.part2mod[idInFilename]['module']                
+            self.outputmodel.meta.instrument.module = self.part2mod[idInFilename]['module']
         elif runID=='CRYO2' or runID=='CRYO3':
             detectorname=self.hdr['DETECTOR']
             self.outputmodel.meta.instrument.filetype= 'UNCALIBRATED'
@@ -136,7 +139,7 @@ class nircam2ssbclass:
                 self.outputmodel.meta.instrument.module = 'B'
             else:
                 raise RuntimeError,'wrong DETECTOR=%s' % detectorname
-        
+
             if re.search('LONG$',detectorname):
                 self.outputmodel.meta.instrument.channel = 'LONG'
             else:
@@ -153,19 +156,19 @@ class nircam2ssbclass:
             else:
                 print 'ERROR! could not get detector!!!'
                 sys.exit(0)
-            
+
             self.outputmodel.meta.instrument.detector = self.part2mod[detectorname]['detector']
             self.outputmodel.meta.instrument.channel = self.part2mod[detectorname]['channel']
             self.outputmodel.meta.instrument.module = self.part2mod[detectorname]['module']
-            
+
             # Below three lines added
 
-            if 'DESCRIP' in self.hdr:                                      
+            if 'DESCRIP' in self.hdr:
                print 'DESCRIP already exist'
             elif reffileflag:
                self.outputmodel.meta.reffile.description = self.hdr['DESCRIPT']
 
-            #if reffileflag:                
+            #if reffileflag:
             #    self.outputmodel.meta.reffile.description = self.hdr['DESCRIPT']
             #    #self.outputmodel.meta.reffile.author = self.hdr['AUTHOR']
         elif runID=='CV3':
@@ -176,28 +179,42 @@ class nircam2ssbclass:
             self.outputmodel.meta.instrument.detector = self.part2mod[detectorname]['detector']
             self.outputmodel.meta.instrument.channel = self.part2mod[detectorname]['channel']
             self.outputmodel.meta.instrument.module = self.part2mod[detectorname]['module']
-     
+
             # Below three lines added
 
-            if 'DESCRIP' in self.hdr:                                      
+            if 'DESCRIP' in self.hdr:
                print 'DESCRIP already exist'
             elif reffileflag:
                self.outputmodel.meta.reffile.description = self.hdr['DESCRIPT']
-         
+        elif runID=='OTIS':
+            if 'SCA_ID' in self.hdr:
+                detectorname=self.hdr['SCA_ID']
+            else:
+                print("ERROR! could not get detector!!!")
+            self.outputmodel.meta.instrument.detector = self.part2mod[detectorname]['detector']
+            self.outputmodel.meta.instrument.channel = self.part2mod[detectorname]['channel']
+            self.outputmodel.meta.instrument.module = self.part2mod[detectorname]['module']
+
+            # Below three lines added
+
+            if 'DESCRIP' in self.hdr:
+               print 'DESCRIP already exist'
+            elif reffileflag:
+               self.outputmodel.meta.reffile.description = self.hdr['DESCRIPT']
         else:
             print 'ERROR!!! dont know runID=%s' % runID
             sys.exit(0)
-            
+
     def getRunID(self,filename=None,hdr=None):
-        if hdr!=None:            
+        if hdr!=None:
             if 'TERROIR' in hdr:
                 if hdr['TERROIR']=='ISIM-CV2':
-                    runID = 'CV2'                
+                    runID = 'CV2'
                     return(runID)
                 else:
                     print 'TERROIR=%s unknown, fix me in nircam2ssb.getRunID!' % hdr['TERROIR']
                     sys.exit(0)
-            
+
         if filename!=None:
 
             basename = os.path.basename(filename)
@@ -225,17 +242,18 @@ class nircam2ssbclass:
                 runID = 'CV3'
             elif re.search('SE\_2016',filename):
                 runID = 'CV3'
+            elif re.search('SE\_2017',filename):
+                runID = 'OTIS'
             elif filename[0:4] in self.modApartIDs or filename[0:4] in self.modBpartIDs:
                 runID='OLD_DET'
-            else:                           
+            else:
                 print 'FIX ME getRunID!!!!',filename
                 sys.exit(0)
-        else:                           
+        else:
             print 'FIX ME getRunID!!!!',filename
             sys.exit(0)
-        print runID
         return(runID)
-            
+
     def updatemetadata_CRYOX(self,runID,filename=None):
         test = self.hdr.get('DATE-OBS',default=-1)
         if test == -1:
@@ -258,7 +276,7 @@ class nircam2ssbclass:
     def updatemetadata_TUCSONNEW(self,runID,filename=None,reffileflag=True):
         if reffileflag:
             self.outputmodel.meta.reffile.author = 'Misselt'
-        
+
         test = self.hdr.get('DATE-OBS',default=-1)
         if test == -1:
             print 'DATE-OBS keyword not found'
@@ -279,7 +297,7 @@ class nircam2ssbclass:
                 self.outputmodel.meta.observation.date = '%sT%s' % (self.hdr['DATE'],'00:00:00')
         else:
             self.outputmodel.meta.observation.date = '%sT%s' % (self.hdr['DATE-OBS'],'00:00:00')
-    
+
         print 'FIXING DATE',self.outputmodel.meta.observation.date
 
 
@@ -292,19 +310,25 @@ class nircam2ssbclass:
         if (not reffileflag) and self.outputmodel.meta.observation.date==None:
             #timeobs=re.sub('\.*','',self.hdr['TIME-OBS']
             self.outputmodel.meta.observation.date = '%sT%s' % (self.hdr['DATE-OBS'],self.hdr['TIME-OBS'])
-          
+
+    def updatemetadata_OTIS(self,runID,filename=None,reffileflag=True):
+        if (not reffileflag) and self.outputmodel.meta.observation.date==None:
+            #timeobs=re.sub('\.*','',self.hdr['TIME-OBS']
+            self.outputmodel.meta.observation.date = '%sT%s' % (self.hdr['DATE-OBS'],self.hdr['TIME-OBS'])
+
     def updatemetadata(self,filename,runID=None,cpmetadata=True,reffileflag=True):
         if runID==None:
             runID=self.runID
-            
+
         if cpmetadata:
             # Update output model with meta data from input
-            dummy4hdr = models.DataModel(filename)        
+            with pyfits.open(filename) as tmp:
+                tmp['PRIMARY'].header['SUBARRAY'] = 'FULL'
+                tmp.writeto(filename,overwrite=True)
+            dummy4hdr = models.DataModel(filename)
             self.outputmodel.update(dummy4hdr) #, primary_only=True)
             dummy4hdr.close()
-            
-        self.outputmodel.meta.instrument.name = 'NIRCAM'
-        self.outputmodel.meta.telescope = 'JWST'
+
         print 'within nircam2ssb, runID is',runID
         if runID in ['CRYO1','CRYO2','CRYO3','OLD_DET']:
             self.updatemetadata_CRYOX(runID,filename=filename)
@@ -314,11 +338,19 @@ class nircam2ssbclass:
             self.updatemetadata_CV2(runID,filename=filename,reffileflag=reffileflag)
         elif runID in ['CV3']:
             self.updatemetadata_CV3(runID,filename=filename,reffileflag=reffileflag)
+        elif runID in ['OTIS']:
+            self.updatemetadata_CV3(runID,filename=filename,reffileflag=reffileflag)
         else:
             print 'ERROR: runID=%s not yet implemented into "updatemetadata"' % runID
             sys.exit(0)
-            
-        
+
+    def get_subarray_name(self,subarrays,colstart, colstop, rowstart, rowstop):
+        for i in np.arange(0,len(subarrays)):
+            subarray_row = subarrays[i]
+            if rowstart == subarray_row['xstart'] and rowstop == subarray_row['xend'] and colstart == subarray_row['ystart'] and colstop == subarray_row['yend']:
+                return subarray_row['Name']
+        return 'UNKNOWN'
+
     def image2ssb(self,inputfilename, outfilebasename='auto',outdir=None,outsuffix=None,outsubdir=None):
         outfilebasename = self.mkoutfilebasename(inputfilename, outfilebasename=outfilebasename,outdir=outdir,outsuffix=outsuffix,outsubdir=outsubdir)
         return(outfilebasename)
@@ -333,10 +365,9 @@ if __name__=='__main__':
 
     if len(args)<1:
         parser.parse_args(['--help'])
-        sys.exit(0)                        
+        sys.exit(0)
 
     nircam2ssb.verbose=options.verbose
 
     for infile in args:
         nircam2ssb.image2ssb(infile,outfilebasename=options.outfilebasename,outdir=options.outdir,outsuffix=options.outsuffix,outsubdir=options.outsubdir)
-        
