@@ -17,11 +17,14 @@ class GainFile:
         self.pedigree = ''
         self.history = ''
         self.outdir = '.'
-
-    def save(self,array):
+        self.fastaxis = 0
+        self.slowaxis = 0
+        
+    def save(self,array,error):
         # Save using datamodel
         mod = GainModel()
         mod.data = array
+        #mod.err = error
         mod.meta.telescope = 'JWST'
         mod.meta.author = self.author
         mod.meta.description = self.descrip
@@ -30,8 +33,8 @@ class GainFile:
         mod.meta.instrument.detector = self.detector
         mod.meta.pedigree = self.pedigree
         mod.meta.reftype = 'GAIN'
-        mod.meta.subarray.fastaxis = -1
-        mod.meta.subarray.slowaxis = 2
+        mod.meta.subarray.fastaxis = self.fastaxis
+        mod.meta.subarray.slowaxis = self.slowaxis
         mod.meta.subarray.name = 'GENERIC'
         mod.meta.subarray.xsize = 2048
         mod.meta.subarray.ysize = 2048
