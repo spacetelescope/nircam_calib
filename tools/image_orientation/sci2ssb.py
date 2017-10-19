@@ -35,7 +35,7 @@ class sci2ssbclass(nircam2ssbclass):
     def image2ssb(self,inputfilename, outfilebasename='auto',outdir=None,outsuffix=None,outsubdir=None):
         outfilebasename = self.mkoutfilebasename(inputfilename, outfilebasename=outfilebasename,outdir=outdir,outsuffix=outsuffix,outsubdir=outsubdir)
         (self.data,self.hdr)=pyfits.getdata(inputfilename, 0, header=True)
-        print 'input shape:',self.data.shape
+        print('input shape:',self.data.shape)
 
         self.runID = self.getRunID(filename=inputfilename)
         self.hdr['SUBARRAY'] = 'FULL'
@@ -47,16 +47,16 @@ class sci2ssbclass(nircam2ssbclass):
             Nint = int(self.hdr['NINT'])
         Ngroup =int(self.hdr['NGROUP'])
         Nframe = int(self.hdr['NFRAME'])
-        print 'NGROUP:',Ngroup
-        print 'NINT:',Nint
+        print('NGROUP:',Ngroup)
+        print('NINT:',Nint)
         if (Ngroup*Nint)!=self.data.shape[0]:
-            raise RuntimeError,'something is wrong! NGROUP=%d, NINT=%d, sum is not shape[0]=%d' % (Ngroup,Nint,self.data.shape[0])
-
+            print('something is wrong! NGROUP=%d, NINT=%d, sum is not shape[0]=%d' % (Ngroup,Nint,self.data.shape[0]))
+            raise RuntimeError
         # rearrange the data: 4th coordinate is integration
         scinew=scipy.zeros((Nint,Ngroup,self.data.shape[1],self.data.shape[2]), dtype=float)
-        for i in xrange(Nint):
+        for i in range(Nint):
             scinew[i,:,:,:]=self.data[i*Ngroup:(i+1)*Ngroup,:,:]
-        print 'output shape:',scinew.shape
+        print('output shape:',scinew.shape)
 
         self.outputmodel = models.RampModel(data=scinew)
 
@@ -97,7 +97,7 @@ class sci2ssbclass(nircam2ssbclass):
         outfilename = outfilebasename
         if not re.search('fits$',outfilename): outfilename += '_uncal.fits'
 
-        print 'Saving %s' % outfilename
+        print('Saving %s' % outfilename)
         self.outputmodel.save(outfilename)
 
         return(outfilename)
