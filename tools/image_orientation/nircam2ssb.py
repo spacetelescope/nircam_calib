@@ -28,7 +28,7 @@ class nircam2ssbclass:
         self.part2mod = {}
         self.modApartIDs = ['16989','17023','17024','17048','17158','C072','C067','C104','C073','C090',481,482,483,484,485]
         self.modBpartIDs = ['16991','17005','17011','17047','17161','C045','C043','C101','C044','C084',486,487,488,489,490]
-        for i in xrange(len(self.modApartIDs)):
+        for i in range(len(self.modApartIDs)):
             self.part2mod[self.modApartIDs[i]]={}
             self.part2mod[self.modBpartIDs[i]]={}
             self.part2mod[self.modApartIDs[i]]['module']='A'
@@ -84,8 +84,8 @@ class nircam2ssbclass:
         if  outfilebasename.lower() == 'auto':
             outfilebasename = re.sub('\.fits$','',filename)
             if outfilebasename==filename:
-                raise RuntimeError,'BUG!!! %s=%s' % (outfilebasename,filename)
-
+                print('BUG!!! %s=%s' % (outfilebasename,filename))
+                raise RuntimeError
         # new outdir?
         if outdir!=None:
            (d,f)=os.path.split(outfilebasename)
@@ -105,7 +105,8 @@ class nircam2ssbclass:
         if dirname!='' and not os.path.isdir(dirname):
             os.makedirs(dirname)
             if not os.path.isdir(dirname):
-                raise RuntimeError, 'ERROR: Cannot create directory %s' % dirname
+                print('ERROR: Cannot create directory %s' % dirname)
+                raise RuntimeError
 
         return(outfilebasename)
 
@@ -121,10 +122,11 @@ class nircam2ssbclass:
             elif self.hdr['DETECTOR']=='LW':
                 self.outputmodel.meta.instrument.channel = 'LONG'
             else:
-                raise RuntimeError,'wrong DETECTOR=%s' % self.hdr['DETECTOR']
+                print('wrong DETECTOR=%s' % self.hdr['DETECTOR'])
+                raise RuntimeError
             self.outputmodel.meta.instrument.detector = 'NRC%s%d' % (self.outputmodel.meta.instrument.module,self.hdr['SCA'])
 
-            print 'TEST!!!',self.outputmodel.meta.instrument.module,self.outputmodel.meta.instrument.channel,self.outputmodel.meta.instrument.detector
+            print('TEST!!!',self.outputmodel.meta.instrument.module,self.outputmodel.meta.instrument.channel,self.outputmodel.meta.instrument.detector)
         elif runID=='TUCSON_PARTNUM':
             idInFilename = filename[0:5]
             self.outputmodel.meta.instrument.detector = self.part2mod[idInFilename]['detector']
@@ -138,23 +140,24 @@ class nircam2ssbclass:
             elif  re.search('^NRCB',detectorname):
                 self.outputmodel.meta.instrument.module = 'B'
             else:
-                raise RuntimeError,'wrong DETECTOR=%s' % detectorname
+                print('wrong DETECTOR=%s' % detectorname)
+                raise RuntimeError
 
             if re.search('LONG$',detectorname):
                 self.outputmodel.meta.instrument.channel = 'LONG'
             else:
                 self.outputmodel.meta.instrument.channel = 'SHORT'
             self.outputmodel.meta.instrument.detector = self.hdr['DETECTOR']
-            print self.outputmodel.meta.instrument.module
-            print self.outputmodel.meta.instrument.channel
-            print self.outputmodel.meta.instrument.detector
+            print(self.outputmodel.meta.instrument.module)
+            print(self.outputmodel.meta.instrument.channel)
+            print(self.outputmodel.meta.instrument.detector)
         elif runID=='CV2':
             if 'TLDYNEID' in self.hdr:
                 detectorname=self.hdr['TLDYNEID']
             elif 'SCA_ID' in self.hdr:
                 detectorname=self.hdr['SCA_ID']
             else:
-                print 'ERROR! could not get detector!!!'
+                print('ERROR! could not get detector!!!')
                 sys.exit(0)
 
             self.outputmodel.meta.instrument.detector = self.part2mod[detectorname]['detector']
@@ -164,7 +167,7 @@ class nircam2ssbclass:
             # Below three lines added
 
             if 'DESCRIP' in self.hdr:
-               print 'DESCRIP already exist'
+               print('DESCRIP already exist')
             elif reffileflag:
                self.outputmodel.meta.reffile.description = self.hdr['DESCRIPT']
 
@@ -183,7 +186,7 @@ class nircam2ssbclass:
             # Below three lines added
 
             if 'DESCRIP' in self.hdr:
-               print 'DESCRIP already exist'
+               print('DESCRIP already exist')
             elif reffileflag:
                self.outputmodel.meta.reffile.description = self.hdr['DESCRIPT']
         elif runID=='OTIS':
@@ -198,11 +201,11 @@ class nircam2ssbclass:
             # Below three lines added
 
             if 'DESCRIP' in self.hdr:
-               print 'DESCRIP already exist'
+               print('DESCRIP already exist')
             elif reffileflag:
                self.outputmodel.meta.reffile.description = self.hdr['DESCRIPT']
         else:
-            print 'ERROR!!! dont know runID=%s' % runID
+            print('ERROR!!! dont know runID=%s' % runID)
             sys.exit(0)
 
     def getRunID(self,filename=None,hdr=None):
@@ -212,7 +215,7 @@ class nircam2ssbclass:
                     runID = 'CV2'
                     return(runID)
                 else:
-                    print 'TERROIR=%s unknown, fix me in nircam2ssb.getRunID!' % hdr['TERROIR']
+                    print('TERROIR=%s unknown, fix me in nircam2ssb.getRunID!' % hdr['TERROIR'])
                     sys.exit(0)
 
         if filename!=None:
@@ -223,7 +226,7 @@ class nircam2ssbclass:
             elif filename[0:5] in self.modApartIDs or filename[0:5] in self.modBpartIDs:
                 runID='TUCSON_PARTNUM'
             elif filename[6:11] in self.modApartIDs or filename[6:11] in self.modBpartIDs:
-                print 'VVVVVVVVVVVVVVVVVV',filename
+                print('VVVVVVVVVVVVVVVVVV',filename)
                 if self.hdr['DATE']>'2014-09':
                     runID='CV2'
                 else:
@@ -247,20 +250,20 @@ class nircam2ssbclass:
             elif filename[0:4] in self.modApartIDs or filename[0:4] in self.modBpartIDs:
                 runID='OLD_DET'
             else:
-                print 'FIX ME getRunID!!!!',filename
+                print('FIX ME getRunID!!!!',filename)
                 sys.exit(0)
         else:
-            print 'FIX ME getRunID!!!!',filename
+            print('FIX ME getRunID!!!!',filename)
             sys.exit(0)
         return(runID)
 
     def updatemetadata_CRYOX(self,runID,filename=None):
         test = self.hdr.get('DATE-OBS',default=-1)
         if test == -1:
-            print 'DATE-OBS keyword not found.'
+            print('DATE-OBS keyword not found.')
             test2 = self.hdr.get('DATE',default=-1)
             if test2 == -1:
-                print 'DATE keyword also not found. Defaulting to dummy value.'
+                print('DATE keyword also not found. Defaulting to dummy value.')
                 self.outputmodel.meta.observation.date = '2000-01-01T00:00:00'
             else:
                 if not re.search('T',test2):
@@ -279,26 +282,26 @@ class nircam2ssbclass:
 
         test = self.hdr.get('DATE-OBS',default=-1)
         if test == -1:
-            print 'DATE-OBS keyword not found'
+            print('DATE-OBS keyword not found')
             test2 = self.hdr.get('DATE',default=-1)
             if test2 == -1:
-                print 'DATE keyword not found. Checking filename as last-ditch effort.'
+                print('DATE keyword not found. Checking filename as last-ditch effort.')
                 test3 = filename[-13:-5]
                 if test3[0:4] in ['2011','2012','2013','2014']:
-                    print 'date string found in filename.'
+                    print('date string found in filename.')
                     dt = test3[0:4] + '-' + test3[4:6] + '-' + test3[6:8] + 'T00:00:00'
-                    print 'using: %s' %dt
+                    print('using: %s' %dt)
                     self.outputmodel.meta.observation.date = dt
                 else:
-                    print 'No date string found in filename check. Using dummy value.'
+                    print('No date string found in filename check. Using dummy value.')
                     self.outputmodel.meta.observation.date = '2000-01-01T00:00:00'
             else:
-                print 'DATE keyword found. Using this for DATE-OBS'
+                print('DATE keyword found. Using this for DATE-OBS')
                 self.outputmodel.meta.observation.date = '%sT%s' % (self.hdr['DATE'],'00:00:00')
         else:
             self.outputmodel.meta.observation.date = '%sT%s' % (self.hdr['DATE-OBS'],'00:00:00')
 
-        print 'FIXING DATE',self.outputmodel.meta.observation.date
+        print('FIXING DATE',self.outputmodel.meta.observation.date)
 
 
     def updatemetadata_CV2(self,runID,filename=None,reffileflag=True):
@@ -329,7 +332,7 @@ class nircam2ssbclass:
             self.outputmodel.update(dummy4hdr) #, primary_only=True)
             dummy4hdr.close()
 
-        print 'within nircam2ssb, runID is',runID
+        print('within nircam2ssb, runID is',runID)
         if runID in ['CRYO1','CRYO2','CRYO3','OLD_DET']:
             self.updatemetadata_CRYOX(runID,filename=filename)
         elif  runID in ['TUCSONNEW','TUCSON_PARTNUM']:
@@ -341,7 +344,7 @@ class nircam2ssbclass:
         elif runID in ['OTIS']:
             self.updatemetadata_CV3(runID,filename=filename,reffileflag=reffileflag)
         else:
-            print 'ERROR: runID=%s not yet implemented into "updatemetadata"' % runID
+            print('ERROR: runID=%s not yet implemented into "updatemetadata"' % runID)
             sys.exit(0)
 
     def get_subarray_name(self,subarrays,colstart, colstop, rowstart, rowstop):
