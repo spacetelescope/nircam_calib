@@ -1,8 +1,8 @@
 #! /usr/bin/env python
 
 '''
-Return a list of required metadata for a given reference file 
-datamodel.
+Generate a dictionary of required metadata for a given reference 
+file datamodel.
 
 This class looks in the yaml files that define the schema for 
 each type of reference file, and returns a dictionary of these
@@ -78,7 +78,6 @@ class Schema():
                             for l2key in l2dict:
                                 self.metadict['meta.'+key+'.'+l2key] = l2dict[l2key]['fits_keyword']
 
-            return self.metadict
 
 
     def add_options(self,parser=None,usage=None):
