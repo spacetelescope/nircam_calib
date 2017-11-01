@@ -1,0 +1,42 @@
+# required
+export JWST_MKREFS_INSTRUMENT=NIRCAM
+export JWST_MKREFS_CONFIGFILE
+
+# not required, but recommended
+export JWST_MKREFS_SRCDIR
+export JWST_MKREFS_DATADIR 
+export JWST_MKREFS_OUTDIR 
+
+if [ -z ${HOSTNAME+x} ]; then
+   echo "HOSTNAME is unset";
+   export HOSTNAME=`hostname`;
+   echo "HOSTNAME set to $HOSTNAME"; 
+fi
+
+if [ -z ${USER+x} ]; then
+   echo "USER is unset";
+   export USER=`whoami`;
+   echo "USER set to $USER"; 
+fi
+
+if [[ $HOSTNAME =~ arminmac* ]] ; then
+      export JWST_MKREFS_SRCDIR=/Users/arest/nircam/nircam_calib/reffile_creation/pipeline
+      export JWST_MKREFS_DATADIR=/Users/arest/nircam/refindir
+      export JWST_MKREFS_OUTDIR=/Users/arest/nircam/refoutdir
+elif [[ $HOSTNAME =~ armin.stsci.edu ]] ; then
+      export JWST_MKREFS_SRCDIR=/users/arest/nircam/nircam_calib/reffile_creation/pipeline
+      export JWST_MKREFS_DATADIR=/users/arest/nircam/refindir
+      export JWST_MKREFS_OUTDIR=/users/arest/nircam/refoutdir
+else 
+   echo ERROR: HOSTNAME UNKOWN! DONT KNOW HOW TO SET JWSTTOOLS_ROOTDIR, QUICKLOOK_ROOTDIR  and QUICKLOOK_OUTDIR
+	check the sourceme file in the config dir!
+   return 1;
+fi
+
+export JWST_MKREFS_CONFIGFILE=$JWST_MKREFS_SRCDIR/mkrefs.cfg
+
+export PS1="\u@\h(mkrefs,$JWST_MKREFS_INSTRUMENT)% "
+
+alias cdsrc='cd $JWST_MKREFS_SRCDIR'
+alias cdin='cd $JWST_MKREFS_DATADIR'
+alias cdout='cd $JWST_MKREFS_OUTDIR'

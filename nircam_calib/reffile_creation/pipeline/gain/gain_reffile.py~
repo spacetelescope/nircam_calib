@@ -1,0 +1,14 @@
+#! /usr/bin/env python
+
+'''
+Create gain reference file using SSB datamodels
+'''
+
+class GainFile:
+    def __init__(self):
+        self.detector = ''
+
+
+    def save(self,array):
+        # Save using datamodel
+        
