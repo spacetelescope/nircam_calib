@@ -15,6 +15,7 @@ from jwst.jump import JumpStep
 from astropy.io import ascii
 from astropy.table import Table
 from astropy.io import fits
+from scipy import stats
 import argparse
 import numpy as np
 import yaml
@@ -24,7 +25,7 @@ class JumpTest():
     """This class runs and tests the output of the jump detection step.
 
     It does several things:
-        - runs jump detection and (optionally) the steps prior 
+        - runs jump detection and (optionally) the steps prior
         - if simulated data, loads the input CR list for comparison
         - looks for detections and notes the CR energy and pixel spread
         - counts how many input CRs were flagged
@@ -181,7 +182,7 @@ class JumpTest():
 
             # save it as an ASCII table
             t2 = Table([[totalcrs],[totalfound],[totalnotfound],[np.round(np.divide(totalfound,totalcrs)*100,decimals=2)]],names=('n_input','n_found','n_missed', 'perc_found'), meta={'name': 'stats table'})
-            ascii.write(t2,self.infile[:-5]+"_jump_CRthresh"+str(self.threshold)+"_stats.dat",format='fixed_width_two_line')
+            ascii.write(t2,self.infile[:-5]+"_jump_CRthresh"+str(self.threshold)+"_stats.dat",format='fixed_width_two_line',overwrite=True)
 
             # write out mask file showing which CRs were found
             hduf = fits.PrimaryHDU()
@@ -203,6 +204,7 @@ class JumpTest():
         # on groups, even if no input CR list is supplied
         counter = 0.
         grpcount = []
+        slopes = []
         flagged = np.zeros((len(groupdq_jump),2048,2048),dtype='bool')
 
         # loop over groups and pixels
@@ -215,12 +217,17 @@ class JumpTest():
                     if groupdq_jump[inds,y,x] == 4:
                         counter += 1
                         flagged[inds,y,x] = True
+                        slope, intercept, r_val, p_val, std_err = stats.linregress(np.arange(0,2), pipeline.data[0,inds-1:inds+1,y,x])
+                        slopes.append(slope)
 
             grpcount.append(np.count_nonzero(groupdq_jump[inds,:,:] == 4))
 
         # save it as an ASCII table
-        t3 = Table([np.arange(0,len(groupdq_jump)).T,np.asfarray([grpcount]).T],names=('group','n_CRflags'), meta={'name': 'stats table'})
+        t3 = Table([[np.arange(0,len(groupdq_jump))],[grpcount]],names=('group','n_CRflags'), meta={'name': 'stats table'})
         ascii.write(t3,self.infile[:-5]+"_jump_CRthresh"+str(self.threshold)+"_groupstats.dat",format='fixed_width_two_line',overwrite=True)
+
+        # save out slope information
+        np.savetxt(self.infile[:-5]+"_jump_CRthresh"+str(self.threshold)+"_slopes.dat",np.round(slopes,decimals=3))
 
         # write out mask showing CR flags in each group
         hdufl = fits.PrimaryHDU()
