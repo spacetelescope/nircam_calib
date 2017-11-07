@@ -15,6 +15,7 @@ from jwst.jump import JumpStep
 from astropy.io import ascii
 from astropy.table import Table
 from astropy.io import fits
+from astrotable import astrotableclass
 from scipy import stats
 import argparse
 import numpy as np
@@ -164,12 +165,6 @@ class JumpTest():
                 if np.shape(np.where(crinfile[cr_frame[i],:,:] > 1))[1] < 2:
                     multipix[i] = 1
 
-            # save information on CR flags based on group, number of pixels affected,
-            # and their energies
-            t = Table([crx, cry, groups.astype(int), max_cr_sig, multipix,res.astype(bool)],
-                names=('x_Pixel','y_Pixel','Group', 'Energy','Spread','Found'),
-                meta={'name': 'results table'})
-            ascii.write(t,self.infile[:-5]+"_jump_CRthresh"+str(self.threshold)+"_energies.dat",format='fixed_width_two_line')
 
             # get total number of CRs input, number found, number missed
             totalcrs = np.float(len(crx))
@@ -180,9 +175,32 @@ class JumpTest():
             print('Total input not found:',totalnotfound)
             print('Percent input found:',(totalfound/totalcrs)*100)
 
-            # save it as an ASCII table
-            t2 = Table([[totalcrs],[totalfound],[totalnotfound],[np.round(np.divide(totalfound,totalcrs)*100,decimals=2)]],names=('n_input','n_found','n_missed', 'perc_found'), meta={'name': 'stats table'})
-            ascii.write(t2,self.infile[:-5]+"_jump_CRthresh"+str(self.threshold)+"_stats.dat",format='fixed_width_two_line',overwrite=True)
+            # save information on CR flags based on group, number of pixels affected,
+            # and their energies
+            buildtable=astrotableclass()
+            buildtable.t['x_Pixel'] =crx.astype(int)
+            buildtable.t['y_Pixel']=cry.astype(int)
+            buildtable.t['Group']=groups.astype(int)
+            buildtable.t['Energy']=max_cr_sig.astype(float)
+            buildtable.t['Spread']=multipix.astype(int)
+            buildtable.t['Found']=res.astype(bool)
+            outfilename = self.infile[:-5]+"_jump_CRthresh"+str(self.threshold)+"_energies.dat"
+            ascii.write(buildtable.t,outfilename,format='fixed_width_two_line',overwrite=True)
+
+            # save counts in an ASCII table
+            buildtable=astrotableclass()
+            buildtable.t['n_input'] =np.asfarray([totalcrs])
+            buildtable.t['n_found']=np.asfarray([totalfound])
+            buildtable.t['n_missed']=np.asfarray([totalnotfound])
+            buildtable.t['perc_found']=np.asfarray([np.round(np.divide(totalfound,totalcrs)*100,decimals=2)])
+            outfilename = self.infile[:-5]+"_jump_CRthresh"+str(self.threshold)+"_stats.dat"
+            ascii.write(buildtable.t,outfilename,format='fixed_width_two_line',overwrite=True)
+
+            # write out energies for CRs that were missed
+            buildtable=astrotableclass()
+            buildtable.t['missed_CR_energies'] = notfound_energy
+            outfilename = self.infile[:-5]+"_jump_CRthresh"+str(self.threshold)+"_notfound_energies.dat"
+            ascii.write(buildtable.t,outfilename,format='fixed_width_two_line',overwrite=True)
 
             # write out mask file showing which CRs were found
             hduf = fits.PrimaryHDU()
@@ -195,9 +213,6 @@ class JumpTest():
             hdunf.data = np.asfarray(notfound)
             hdunf.header['DATA'] = 'Input CRs not found'
             hdunf.writeto(self.infile[:-5]+"_jump_CRthresh"+str(self.threshold)+"_notfound.fits",overwrite=True)
-
-            # write out energies for CRs that were missed
-            np.savetxt(self.infile[:-5]+"_jump_CRthresh"+str(self.threshold)+"_notfound_energies.dat",notfound_energy)
 
 
         # set up counter and arrays to check number of pixels flagged based
@@ -223,11 +238,17 @@ class JumpTest():
             grpcount.append(np.count_nonzero(groupdq_jump[inds,:,:] == 4))
 
         # save it as an ASCII table
-        t3 = Table([[np.arange(0,len(groupdq_jump))],[grpcount]],names=('group','n_CRflags'), meta={'name': 'stats table'})
-        ascii.write(t3,self.infile[:-5]+"_jump_CRthresh"+str(self.threshold)+"_groupstats.dat",format='fixed_width_two_line',overwrite=True)
+        buildtable=astrotableclass()
+        buildtable.t['group'] = np.arange(0,len(groupdq_jump)).astype(int)
+        buildtable.t['n_CRflags'] = grpcount
+        outfilename = self.infile[:-5]+"_jump_CRthresh"+str(self.threshold)+"_groupstats.dat"
+        ascii.write(buildtable.t,outfilename,format='fixed_width_two_line',overwrite=True)
 
         # save out slope information
-        np.savetxt(self.infile[:-5]+"_jump_CRthresh"+str(self.threshold)+"_slopes.dat",np.round(slopes,decimals=3))
+        buildtable=astrotableclass()
+        buildtable.t['jump_slopes'] = slopes
+        outfilename = self.infile[:-5]+"_jump_CRthresh"+str(self.threshold)+"_slopes.dat"
+        ascii.write(buildtable.t,outfilename,format='fixed_width_two_line',overwrite=True)
 
         # write out mask showing CR flags in each group
         hdufl = fits.PrimaryHDU()
