@@ -15,7 +15,7 @@ script:
 
 The steps in this script are:
 
-    1.) read in a list of exposures to use
+    1.) read in a list of uncalibrated exposures to use
     2.) use signal difference between consecutive reads to find saturation
     3.) take average of saturated reads as hard saturation
     4.) when final saturation levels are found, average together values
@@ -75,7 +75,7 @@ class MakeSatRef:
         if parser is None:
             parser = argparse.ArgumentParser(usage=usage)
             parser.add_argument("listfile",
-                                help="List of files to use.")
+                                help="List of uncalibrated exposures to use.")
             parser.add_argument("--intermediates",
                                 default=False,
                                 action="store_true",
@@ -454,7 +454,7 @@ class MakeSatRef:
         new_dq[locs] = big_dq[0][locs]
 
         # Get statistics for saturation values, averaging over exposures.
-        avg, err = self.calc_stats(sat_arr, new_dq)
+        avg, err = self.calc_stats(sat_arr, big_dq)
 
         # Save saturation values for each exposure to a FITS file
         newhdu = fits.PrimaryHDU(sat_arr)
