@@ -2,11 +2,11 @@
 
 import re,sys,string,os,types
 
-from ConfigParser import SafeConfigParser
+#from ConfigParser import SafeConfigParser
 
 
 def executecommand(cmd,successword,errorlog=None,cmdlog=None,verbose=1):
-    if verbose: print 'executing: ',cmd
+    if verbose: print('executing: ',cmd)
     (cmd_in,cmd_out)=os.popen4(cmd)
     output = cmd_out.readlines()
     if successword=='':
@@ -19,7 +19,7 @@ def executecommand(cmd,successword,errorlog=None,cmdlog=None,verbose=1):
                 successflag = 1                       
     errorflag = not successflag
     if errorflag:
-        print 'error executing:',cmd
+        print('error executing:',cmd)
         if errorlog != None:
             append2file(errorlog,['\n error executing: '+cmd+'\n'])
             append2file(errorlog,output)
@@ -37,7 +37,7 @@ def makepath(path,raiseError=1):
         os.makedirs(path)
         if not os.path.isdir(path):
             if raiseError == 1:
-                raise RuntimeError, 'ERROR: Cannot create directory %s' % path
+                raise RuntimeError('ERROR: Cannot create directory %s' % path)
             else:
                 return(1)
     return(0)
@@ -55,7 +55,7 @@ def rmfile(filename,raiseError=1):
         os.remove(filename)
         if os.path.isfile(filename): 
             if raiseError == 1:
-                raise RuntimeError, 'ERROR: Cannot remove %s' % filename
+                raise RuntimeError('ERROR: Cannot remove %s' % filename)
             else:
                 return(1)
     return(0)
@@ -87,6 +87,7 @@ def AnotB(A,B):
     return d.keys()
 
 # Extend generic ConfigParser so that environment variables are substituted
+'''
 class ConfigParser_env(SafeConfigParser):
     def __init__(self):
         SafeConfigParser.__init__(self)
@@ -113,12 +114,12 @@ class ConfigParser_env(SafeConfigParser):
             if self.has_option(section,option):
                 errorflag = self.set(section,option,val)
                 if errorflag!=None and throwerror:
-                    raise RuntimeError,"ERROR %s %s %s" % (section,option,val)
+                    raise RuntimeError("ERROR %s %s %s" % (section,option,val))
                 foundflag=True
                 if not allflag:
                     break
         if (not foundflag) and throwerror:
-            raise RuntimeError,"ERROR: could not find section=%s, parameter=%s!" % (section,option)
+            raise RuntimeError("ERROR: could not find section=%s, parameter=%s!" % (section,option))
             
         return(not foundflag)
 
@@ -136,11 +137,12 @@ class ConfigParser_env(SafeConfigParser):
             if not self.has_option(section,option):
                 errorflagall = True
                 if throwerror:
-                    raise RuntimeError,"ERROR: section=%s, parameter=%s does not exist!" % (section,option)   
+                    raise RuntimeError("ERROR: section=%s, parameter=%s does not exist!" % (section,option))
                 continue
             errorflag = self.set(section,option,val)
             if errorflag != None:
                 errorflagall = True
                 if throwerror:
-                    raise RuntimeError,"ERROR: could not set section=%s, parameter=%s to value %s!" % (section,option,val)                
+                    raise RuntimeError("ERROR: could not set section=%s, parameter=%s to value %s!" % (section,option,val))
         return(errorflagall)
+'''
