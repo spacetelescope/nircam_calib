@@ -8,9 +8,9 @@ import numpy as np
 import scipy
 from scipy.signal import convolve, boxcar
 import scipy.ndimage as ndi
-from tools import rmfile,makepath4file
-from sigmacut import calcaverageclass
-from texttable import txttableclass
+from ....tools.misc.tools import rmfile,makepath4file
+from ....tools.math.sigmacut import calcaverageclass
+from ....tools.misc.texttable import txttableclass
 
 class frameresetclass:
     def __init__(self, instrument='nircam', imagesize='fullimage'):

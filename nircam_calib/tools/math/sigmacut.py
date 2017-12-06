@@ -54,7 +54,7 @@ class calcaverageclass:
                     s = format % (self.i,self.mean,self.mean_err,0.0,0.0,self.Nchanged,self.Nused,self.Nskipped)
             return(s)
         else:
-            print " mean:",self.mean," mean_err:",self.mean_err," stdev:",self.stdev," Nchanged:",self.Nchanged," Nused:",self.Nused," Nskipped:",self.Nskipped
+            print(" mean:",self.mean," mean_err:",self.mean_err," stdev:",self.stdev," Nchanged:",self.Nchanged," Nused:",self.Nused," Nskipped:",self.Nskipped)
             return('ERROR')
 
     def results2texttable(self,t,key=None,meancol='mean',meanerrcol='mean_err',stdevcol='stdev',stdeverrcol='stdev_err',Nusedcol='Nused',Nskippedcol='Nskipped',Pskippedcol='Pskipped',Pgoodcol='Pgood',convergedcol='converged',iterationcol='i',format='%.2f',initcols=False):
@@ -203,7 +203,7 @@ class calcaverageclass:
                 lowval = tmp[Nclip]
                 highval = tmp[-Nclip]
                 if verbose:
-                    print 'Clipping the top and bottom %f percent of values: lower limit:%f, upper limit:%f' % (percentclip,lowval,highval)
+                    print('Clipping the top and bottom %f percent of values: lower limit:%f, upper limit:%f' % (percentclip,lowval,highval))
                 del tmp
                     
                 self.use = scipy.logical_and(self.use,scipy.where(scipy.logical_and(data>=lowval,data<=highval),True,False)) 
@@ -270,7 +270,7 @@ class calcaverageclass:
             else:
                 self.calcaverage_errorcut(data,mask=mask,noise=noise,Nsigma=Nsigma,medianflag=medianflag,verbose=verbose)
             if verbose>=2:
-                print self.__str__()
+                print(self.__str__())
             # Not converged???
             if self.stdev==None or self.stdev==0.0 or self.mean==None:
                 self.converged=False
