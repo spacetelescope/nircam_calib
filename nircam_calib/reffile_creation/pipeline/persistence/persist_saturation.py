@@ -28,7 +28,7 @@ The output files are:
 
     1.) SSB formatted FITS file with averaged saturation values in the SCI
         extension, along with corresponding DQ and DQ_DEF extensions
-    2.) FITS file with errors on saturation values (SaturationModel doesn't have
+    2.) FITS file with errors on saturation values (PersistenceSatModel doesn't have
         ERR extension yet?).
     3.) FITS file with saturation values for each input exposure in the listfile.
     4.) FITS file containing first saturated group values for each exposure.
@@ -48,7 +48,7 @@ from astropy.stats import sigma_clip
 from jwst.dq_init import DQInitStep
 from jwst.superbias import SuperBiasStep
 from jwst.refpix import RefPixStep
-from jwst.datamodels import SaturationModel
+from jwst.datamodels import PersistenceSatModel
 
 DET_NUM = {'NRCA1': 17004,
            'NRCA2': 17006,
@@ -230,7 +230,7 @@ class MakeSatRef:
         return averages, errs
 
 
-    def make_proper_header(self, model, files):
+    def make_proper_header(self, model, files, output):
         '''Make sure the reference file has the correct headers.'''
 
         # Read in headers from one of the input files.
@@ -238,7 +238,18 @@ class MakeSatRef:
             header0 = fil[0].header
 
         # Change the header values.
-        model.meta.reftype = 'SATURATION'
+        model.meta.author = 'Canipe'
+        meta.date = str(datetime.datetime.now())
+        model.meta.description = 'Saturation reference file from CV3 data'
+        model.meta.filename = str(output)
+        model.meta.filetype = 'REFERENCE'
+        model.meta.reftype = 'PERSAT'
+        model.meta.model_type = 'PersistenceSatModel'
+        model.meta.origin = 'STSCI'
+        model.meta.pedigree = 'DUMMY'
+        model.meta.useafter = '2017-11-29'
+        model.meta.telescope = 'JWST'
+        model.meta.time_sys = 'UTC'
         model.meta.subarray.xsize = header0['SUBSIZE1']
         model.meta.subarray.ysize = header0['SUBSIZE2']
         model.meta.subarray.xstart = header0['SUBSTRT1']
@@ -264,10 +275,6 @@ class MakeSatRef:
             model.meta.subarray.fastaxis = 1
             model.meta.subarray.slowaxis = 2
 
-        # model.meta.reffile.author = 'Canipe'
-        model.meta.description = 'Saturation reference file from CV3 data'
-        model.meta.pedigree = 'DUMMY'
-        model.meta.useafter = '2017-11-29'
 
         # Add HISTORY (this needs to be edited still).
         model.history.append('Description of Reference File Creation')
@@ -306,11 +313,11 @@ class MakeSatRef:
     def save_reffile(self, sat, err, passedmap, files, output):
         '''Save the reference file using JWST data models.'''
 
-        # Use jwst.datamodels SaturationModel to put data in correct FITS format.
-        finalsaturation = SaturationModel()
+        # Use jwst.datamodels PersistenceSatModel to put data in correct FITS format.
+        finalsaturation = PersistenceSatModel()
         finalsaturation.data = sat
 
-        # Need to add errors but SaturationModel doesn't have ERR extension yet.
+        # Need to add errors but PersistenceSatModel doesn't have ERR extension yet.
         finalsaturation.err = err
 
         # Create DQ flag definition table.
@@ -331,7 +338,7 @@ class MakeSatRef:
         finalsaturation.dq_def = dqdef
 
         # Create the proper headers.
-        finalsaturation = self.make_proper_header(finalsaturation, files)
+        finalsaturation = self.make_proper_header(finalsaturation, files, output)
 
         # Save the reference file.
         outfile = output
