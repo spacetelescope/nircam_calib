@@ -2,6 +2,7 @@
 
 '''
 Create gain reference file using SSB datamodels
+given the final gain array and error maps
 '''
 
 import os
