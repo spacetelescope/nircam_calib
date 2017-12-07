@@ -239,8 +239,8 @@ class MakeSatRef:
 
         # Change the header values.
         model.meta.author = 'Canipe'
-        meta.date = str(datetime.datetime.now())
-        model.meta.description = 'Saturation reference file from CV3 data'
+        model.meta.date = str(datetime.datetime.now())
+        model.meta.description = 'Persistence saturation reference file from CV3 data'
         model.meta.filename = str(output)
         model.meta.filetype = 'REFERENCE'
         model.meta.reftype = 'PERSAT'
@@ -468,7 +468,7 @@ class MakeSatRef:
         newhdulist = fits.HDUList([newhdu])
         grpname = detector + '_'  \
                       + str(DET_NUM[detector])  \
-                      + '_WellDepthADU_'  \
+                      + '_PersistenceSatADU_'  \
                       + str(datetime.date.today())  \
                       + '_beforeAverage.fits'
         newhdulist.writeto(grpname, overwrite=True)
@@ -478,7 +478,7 @@ class MakeSatRef:
         newhdulist = fits.HDUList([newhdu])
         grpname = detector + '_'  \
                       + str(DET_NUM[detector])  \
-                      + '_WellDepthADU_'  \
+                      + '_PersistenceSatADU_'  \
                       + str(datetime.date.today())  \
                       + '_firstSatGroup.fits'
         newhdulist.writeto(grpname, overwrite=True)
@@ -486,9 +486,9 @@ class MakeSatRef:
         # Save averaged saturation values to a FITS file.
         outfilename = detector + '_'  \
                           + str(DET_NUM[detector])  \
-                          + '_WellDepthADU_'  \
+                          + '_PersistenceSatADU_'  \
                           + str(datetime.date.today())  \
-                          + '_ssbsaturation_DMSorient.fits'
+                          + '_ssbpersat_DMSorient.fits'
         outfile = self.save_reffile(avg, err, new_dq, files, outfilename)
 
         # Save saturation errors, since the pipeline doesn't currently use them
@@ -496,7 +496,7 @@ class MakeSatRef:
         errhdulist = fits.HDUList([errhdu])
         errname = detector + '_'  \
                           + str(DET_NUM[detector])  \
-                          + '_WellDepthADU_'  \
+                          + '_PersistenceSatADU_'  \
                           + str(datetime.date.today())  \
                           + '_saturationErrors.fits'
         errhdulist.writeto(errname, overwrite=True)
