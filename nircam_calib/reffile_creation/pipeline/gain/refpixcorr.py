@@ -8,9 +8,9 @@ import numpy as np
 import scipy
 from scipy.signal import convolve, boxcar
 import scipy.ndimage as ndi
-from tools import rmfile,makepath4file
-from sigmacut import calcaverageclass
-from texttable import txttableclass
+from ....tools.misc.tools import rmfile,makepath4file
+from ....tools.math.sigmacut import calcaverageclass
+from ....tools.misc.texttable import txttableclass
 
 class frameresetclass:
     def __init__(self, instrument='nircam', imagesize='fullimage'):
@@ -34,9 +34,9 @@ class frameresetclass:
                 self.refbottomindex = 0
                 self.reftopindex=2
             else:
-                raise RuntimeError,'imagesize!=fullimage not yet implemented, check __init__ of frameresetclass'
+                raise RuntimeError('imagesize!=fullimage not yet implemented, check __init__ of frameresetclass')
         else:
-            raise RuntimeError,'instrument!=nircam not yet implemented, check __init__ of frameresetclass'
+            raise RuntimeError('instrument!=nircam not yet implemented, check __init__ of frameresetclass')
 
         # get the min/max for the different regions (amplifiers, overscan etc)
         self.getxyminmax4regions()
@@ -62,7 +62,7 @@ class frameresetclass:
             self.xmins[self.refrightindex]=self.nx-self.refpixdxright
             self.xmaxs[self.refrightindex]=self.nx
 
-        for amp in xrange(1,self.Namps+1):
+        for amp in range(1,self.Namps+1):
 
             xmin = (amp-1)*self.nxamp
             xmax = (amp)*self.nxamp
@@ -97,18 +97,18 @@ class frameresetclass:
         if ymin==None: ymin=0
         if ymax==None: ymax = vec.shape[0]
         rmfile(vecfilename)
-        print 'Saving vector into',vecfilename
+        print('Saving vector into',vecfilename)
         f=open(vecfilename,'w')
         s = '#   %s' % ycolname
-        for x in xrange(vec.shape[1]):
+        for x in range(vec.shape[1]):
             s+=' %6s%d' % (xcolnameprefix,x)
             if vecnoise!=None:
                 s+=' %3s%derr' % (xcolnameprefix,x)
         f.write(s+'\n')
 
-        for y in xrange(ymin,ymax):
+        for y in range(ymin,ymax):
             s = ' %4d' % y
-            for x in xrange(vec.shape[1]):
+            for x in range(vec.shape[1]):
                 s+= ' %7.3f' % vec[y,x]
                 if vecnoise!=None:
                     s+=' %7.3f' %  vecnoise[y,x]
@@ -119,18 +119,18 @@ class frameresetclass:
         if ymin==None: ymin=0
         if ymax==None: ymax = vec.shape[0]
         rmfile(vecfilename)
-        print 'Saving vector into',vecfilename
+        print('Saving vector into',vecfilename)
         f=open(vecfilename,'w')
         s = '#   %s' % ycolname
-        for x in xrange(vec.shape[1]):
+        for x in range(vec.shape[1]):
             s+=' %6s%d' % (xcolnameprefix,x)
             if vecnoise!=None:
                 s+=' %3s%derr' % (xcolnameprefix,x)
         f.write(s+'\n')
 
-        for y in xrange(ymin,ymax):
+        for y in range(ymin,ymax):
             s = ' %4d' % y
-            for x in xrange(vec.shape[1]):
+            for x in range(vec.shape[1]):
                 s+= ' %7.3f' % vec[y,x]
                 if vecnoise!=None:
                     s+=' %7.3f' %  vecnoise[y,x]
@@ -140,8 +140,8 @@ class frameresetclass:
     def calcframereset(self,im,xmin,xmax,method='first'):
         ### calculate the offset between the different groups of a ramp
         if len(im.shape)!=3:
-            print 'Shape: ',im.shape
-            raise RuntimeError,'3-dim image required!'
+            print('Shape: ',im.shape)
+            raise RuntimeError('3-dim image required!')
 
         itop    = self.reftopindex
         ibottom = self.refbottomindex
@@ -160,19 +160,19 @@ class frameresetclass:
         # calculate the average differences for top and bottom
         for i in [ibottom,itop]:
             if self.verbose>1:
-                if i==ibottom: print '### bottom ref pixels'
-                else:  print '### top ref pixels'
+                if i==ibottom: print('### bottom ref pixels')
+                else:  print('### top ref pixels')
             if method == 'next':
                 gmax = im.shape[0]
                 diffim = im[1:gmax,self.ymins[i]:self.ymaxs[i],xmin:xmax]-im[0:gmax-1,self.ymins[i]:self.ymaxs[i],xmin:xmax]
             elif method == 'first':
                 gmax = im.shape[0]
-                #for g in xrange(1,im.shape[0]):
+                #for g in range(1,im.shape[0]):
                 diffim = im[1:gmax,self.ymins[i]:self.ymaxs[i],xmin:xmax]-im[0,self.ymins[i]:self.ymaxs[i],xmin:xmax]
             else:
-                raise RuntimeError, 'method %s not yet implemented!' % method
+                raise RuntimeError('method %s not yet implemented!' % method)
 
-            for g in xrange(diffim.shape[0]):
+            for g in range(diffim.shape[0]):
                 self.sigmacut.calcaverage_sigmacutloop(diffim[g,:,:],median_firstiteration=True,verbose=(self.verbose>2),Nsigma=3.0)
                 vec[g+1,i]=self.sigmacut.mean
                 vecerr[g+1,i]=self.sigmacut.mean_err
@@ -182,17 +182,17 @@ class frameresetclass:
             if method == 'next':
                 vecsum = 0
                 vecerrsum2 = 0
-                for g in xrange(1,vec.shape[0]):
+                for g in range(1,vec.shape[0]):
                     framereset[g,i] = (vec[g,i] + vecsum)
                     dframereset[g,i] = math.sqrt(vecerr[g,i]*vecerr[g,i]+vecerrsum2)
                     vecsum += vec[g,i]
                     vecerrsum2 += vecerr[g,i]*vecerr[g,i]
             elif method == 'first':
-                for g in xrange(1,vec.shape[0]):
+                for g in range(1,vec.shape[0]):
                     framereset[g,i] = vec[g,i]
                     dframereset[g,i] = vecerr[g,i]
             else:
-                raise RuntimeError, 'method %s not yet implemented!' % method
+                raise RuntimeError('method %s not yet implemented!' % method)
 
         # calculate average offset
         framereset[1:vec.shape[0],1] = 0.5*(framereset[1:vec.shape[0],ibottom]+framereset[1:vec.shape[0],itop])
@@ -200,7 +200,7 @@ class frameresetclass:
         mean = scipy.mean(framereset[:,1])
         framereset[:,:] -= mean
 
-        #for g in xrange(1,vec.shape[0]):
+        #for g in range(1,vec.shape[0]):
         #    dframereset[g,1] = 0.5 * math.sqrt(dframereset[g,ibottom]*dframereset[g,ibottom]+dframereset[g,itop]*dframereset[g,itop])
         # faster and as good:
         meanerror_bottom = scipy.mean(dframereset[:,ibottom])
@@ -221,9 +221,9 @@ class frameresetclass:
         # difference between the ref top to average
         reftop_deltaoffset = scipy.zeros((im.shape[0],self.Namps+1), dtype=float)
 
-        for amp in xrange(1,self.Namps+1):
+        for amp in range(1,self.Namps+1):
             if self.verbose:
-                print '########### Calculating frame reset for amp %d, method %s' % (amp,method)
+                print('########### Calculating frame reset for amp %d, method %s' % (amp,method))
             (framereset_amp,dframereset_amp) = self.calcframereset(im,self.xmins[amp],self.xmaxs[amp],method=method)
             #framereset_amp[:,0]: ref bottom
             #framereset_amp[:,1]: ref average(top,bottom)
@@ -241,7 +241,7 @@ class frameresetclass:
         return(framereset,dframereset,refbottom_deltaoffset,reftop_deltaoffset)
 
     def subtractframeresetoffset(self,im,framereset):
-        for amp in xrange(1,self.Namps+1):
+        for amp in range(1,self.Namps+1):
             xmin = self.xmins[amp]
             xmax = self.xmaxs[amp]
             if amp==1: # include left overscan
@@ -250,13 +250,13 @@ class frameresetclass:
                 xmax = self.xmaxs[amp+1]
             ymin = 0
             ymax = self.ny
-            if self.verbose: print "subtracting frame reset for amp %d: x=%d-%d, y=%d-%d" % (amp,xmin,xmax,ymin,ymax)
-            for g in xrange(im.shape[0]):
+            if self.verbose: print("subtracting frame reset for amp %d: x=%d-%d, y=%d-%d" % (amp,xmin,xmax,ymin,ymax))
+            for g in range(im.shape[0]):
                 im[g,ymin:ymax,xmin:xmax] -= framereset[g,amp]
                 #im[0:im.shape[0],ymin:ymax,xmin:xmax] -= framereset[0:im.shape[0],amp]
 
     def correct4topbottomdifference(self,im,refbottom_deltaoffset,reftop_deltaoffset):
-        for amp in xrange(1,self.Namps+1):
+        for amp in range(1,self.Namps+1):
             xmin = self.xmins[amp]
             xmax = self.xmaxs[amp]
             if amp==1: # include left overscan
@@ -265,11 +265,11 @@ class frameresetclass:
                 xmax = self.xmaxs[amp+1]
             ymin = 0
             ymax = self.ny
-            if self.verbose: print "Correcting for differences between top and bottom ref pixels for amp %d: x=%d-%d, y=%d-%d" % (amp,xmin,xmax,ymin,ymax)
-            yrange = xrange(ymin,ymax)
-            for g in xrange(im.shape[0]):
-                print 'nnn',reftop_deltaoffset[g,amp],refbottom_deltaoffset[g,amp]
-                if self.verbose>1 and (g % 10) == 0: print "group %d" % g
+            if self.verbose: print("Correcting for differences between top and bottom ref pixels for amp %d: x=%d-%d, y=%d-%d" % (amp,xmin,xmax,ymin,ymax))
+            yrange = range(ymin,ymax)
+            for g in range(im.shape[0]):
+                print('nnn',reftop_deltaoffset[g,amp],refbottom_deltaoffset[g,amp])
+                if self.verbose>1 and (g % 10) == 0: print("group %d" % g)
                 line_slope = (reftop_deltaoffset[g,amp]-refbottom_deltaoffset[g,amp])/(ymax-ymin)
                 line_offset = refbottom_deltaoffset[g,amp] - line_slope*ymin
                 for y in yrange:
@@ -370,7 +370,7 @@ class refpixcorrclass(frameresetclass):
         if  outfilebasename.lower() == 'auto':
             outfilebasename = re.sub('\.fits$','',filename)
             if outfilebasename ==filename:
-                raise RuntimeError,'BUG!!! %s=%s' % (outfilebasename,filename)
+                raise RuntimeError('BUG!!! %s=%s' % (outfilebasename,filename))
         if outsuffix!=None:
             outfilebasename += '.'+outsuffix
         if outsubdir!=None:
@@ -392,10 +392,10 @@ class refpixcorrclass(frameresetclass):
         self.data_is_refpixcorrected = False
 
         # load image
-        if self.verbose: print 'Loading ',filename
+        if self.verbose: print('Loading ',filename)
         self.data, self.hdr = pyfits.getdata(filename, 0, header=True)
         if len(self.data.shape)==4:
-            print 'SSB-conform image'
+            print('SSB-conform image')
             newdata = scipy.zeros(self.data.shape[1:], dtype=float)
             newdata[:,:,:] = self.data[0,:,:,:]
             self.data = newdata
@@ -404,17 +404,17 @@ class refpixcorrclass(frameresetclass):
 
         #load mask
         if bpmfilename!=None:
-            if self.verbose: print 'Loading bpm',bpmfilename
+            if self.verbose: print('Loading bpm',bpmfilename)
             self.maskdata, self.maskhdr = pyfits.getdata(bpmfilename, 0, header=True)
 
         # load noise
         if noisefilename!=None:
-            if self.verbose: print 'Loading noise',noisefilename
+            if self.verbose: print('Loading noise',noisefilename)
             self.noisedata, self.noisehdr = pyfits.getdata(noisefilename, 0, header=True)
 
     def mkdiffimcorr(self, savediffimflag=False):
         # calculate diffim
-        print 'corrected image shape:',self.datacorr.shape
+        print('corrected image shape:',self.datacorr.shape)
 
         gmax = self.datacorr.shape[0]
         self.diffimcorr = self.datacorr[1:gmax,:,:]-self.datacorr[0,:,:]
@@ -423,12 +423,12 @@ class refpixcorrclass(frameresetclass):
         if savediffimflag:
             diffimoutfilename = self.outfilebasename + '.diffimcorr.fits'
             rmfile(diffimoutfilename)
-            print 'Saving corrected diffim',diffimoutfilename
+            print('Saving corrected diffim',diffimoutfilename)
             pyfits.writeto(diffimoutfilename,self.diffimcorr,self.hdr)
 
     def mkdiffim(self, savediffimflag=False, outsuffix='auto'):
         # calculate diffim
-        print 'image shape:',self.data.shape
+        print('image shape:',self.data.shape)
 
         gmax = self.data.shape[0]
         self.diffim = self.data[1:gmax,:,:]-self.data[0,:,:]
@@ -440,7 +440,7 @@ class refpixcorrclass(frameresetclass):
             else:
                 diffimoutfilename= self.outfilebasename + outsuffix
             rmfile(diffimoutfilename)
-            print 'Saving diffim',diffimoutfilename
+            print('Saving diffim',diffimoutfilename)
             pyfits.writeto(diffimoutfilename,self.diffim,self.hdr)
 
     def initbiasdriftvec(self,diffimshape):
@@ -455,8 +455,8 @@ class refpixcorrclass(frameresetclass):
     def calcbiasdriftvec(self,im,xmin,xmax,ymin,ymax,noise=None,mask=None,median_firstiteration=True,Nsigma=3.0):
         ### calculate the average for each row
         if len(im.shape)!=2:
-            print 'Shape: ',im.shape
-            raise RuntimeError,'2-dim image required!'
+            print('Shape: ',im.shape)
+            raise RuntimeError('2-dim image required!')
 
         vec = {}
         for exttype in ['sci','err','stdev','X2norm']:
@@ -464,7 +464,7 @@ class refpixcorrclass(frameresetclass):
         for exttype in ['Nused','Nclipped']:
             vec[exttype] = scipy.zeros((ymax-ymin), dtype=np.uint16)
  
-        for y in xrange(ymin,ymax):
+        for y in range(ymin,ymax):
             noiserow = maskrow = None
             if noise!=None:
                 noiserow = noise[y:y+1,xmin:xmax]
@@ -515,29 +515,29 @@ class refpixcorrclass(frameresetclass):
             cols4vectxt=self.cols4vectxt
 
         if len(vec['sci'].shape)!=3:
-            raise RuntimeError,"wrong shape of %d, shape=3 expected" % (vec['sci'].shape)
+            raise RuntimeError("wrong shape of %d, shape=3 expected" % (vec['sci'].shape))
         if ymin==None: ymin=0
         if ymax==None: ymax = vec['sci'].shape[1]
         if gmin==None: gmin=0
         if gmax==None: gmax = vec['sci'].shape[0]
 
         rmfile(vecfilename)
-        print 'Saving vector into',vecfilename
+        print('Saving vector into',vecfilename)
         f=open(vecfilename,'w')
 
         Nx = vec['sci'].shape[2]
 
         # make header
         s = '#  %s    %s' % (zcolname,ycolname)
-        for x in xrange(Nx):
+        for x in range(Nx):
             for coltype in cols4vectxt:
                 s+=' %10s' % colname(x,coltype,Nx)
         f.write(s+'\n')
 
-        for g in xrange(gmin,gmax):
-            for y in xrange(ymin,ymax):
+        for g in range(gmin,gmax):
+            for y in range(ymin,ymax):
                 s = ' %3d %4d' % (g,y)
-                for x in xrange(Nx):
+                for x in range(Nx):
                     for coltype in cols4vectxt:
                         if np.isnan(vec[coltype][g,y,x]):
                             s+= ' %10s' % '-'
@@ -555,7 +555,7 @@ class refpixcorrclass(frameresetclass):
             self.savebiasdriftvec_as_txt(self.biasdriftvec_refpixcorrright,self.getbiasdriftvecfilename(txtflag=True,extrasuffix='refpixcorrright'),cols4vectxt=['sci'])
 
         if save_g_separately:
-            for g in xrange(gmin,gmax):
+            for g in range(gmin,gmax):
                 self.savebiasdriftvec_as_txt(self.biasdriftvec,self.getbiasdriftvecfilename(txtflag=True,g=g),gmin=g,gmax=g+1)
                 if boxsize!=None:
                     self.savebiasdriftvec_as_txt(self.biasdriftvec_smoothed,self.getbiasdriftvecfilename(txtflag=True,extrasuffix='smoothed',g=g),gmin=g,gmax=g+1,cols4vectxt=['sci'])
@@ -573,7 +573,7 @@ class refpixcorrclass(frameresetclass):
         output = pyfits.HDUList(hdulist)
 
         # save it....
-        print 'Saving biasdriftvec',biasdriftvecfilename
+        print('Saving biasdriftvec',biasdriftvecfilename)
         output.writeto(biasdriftvecfilename,clobber=True)
 
     def savebiasdriftvecs(self,boxsize=None):
@@ -590,7 +590,7 @@ class refpixcorrclass(frameresetclass):
         return vec_smooth
 
     def calcbiasdriftvec_allgroups(self,gmin=None,gmax=None,ymin=None,ymax=None,boxsize=None,savebiasdriftvec_as_txt=False):
-        print 'SHAPE:',self.diffim.shape
+        print('SHAPE:',self.diffim.shape)
 
         if gmin == None: gmin=0
         if gmax == None: gmax=self.diffim.shape[0]
@@ -619,13 +619,13 @@ class refpixcorrclass(frameresetclass):
             '### calculating refpix vector ###'
 
         # loop through groups
-        for g in xrange(gmin,gmax):
+        for g in range(gmin,gmax):
             if self.verbose:
-                print 'g: ',g
+                print('g: ',g)
             # loop through regions: i=0: left overscan, 1-4: amps 1-4, i=5: right overscan
             for i in [self.refleftindex,self.refrightindex]:
                 if self.verbose>1:
-                    print 'x=%d-%d' % (self.xmins[i],self.xmaxs[i])
+                    print('x=%d-%d' % (self.xmins[i],self.xmaxs[i]))
 
                 median_firstiteration = True
                 Nsigma=3.0
@@ -657,7 +657,7 @@ class refpixcorrclass(frameresetclass):
     def correctimage4leftrightrefpix(self,boxsize=None,testflag=False):
         self.data_is_refpixcorrected = False
         if self.verbose:
-            print '### Appplying ref pix correction ###'
+            print('### Appplying ref pix correction ###')
 
         #self.datacorr = copy.deepcopy(self.data)
         corrim = np.zeros((self.data.shape[0]-1,self.data.shape[1],self.data.shape[2]),dtype=np.double)
@@ -698,11 +698,11 @@ class refpixcorrclass(frameresetclass):
 
     def savecorrectedimage(self,filename=None):
         if not self.data_is_refpixcorrected:
-            raise RuntimeError,'Cannot save corrected image, doesn\'t exist yet!'
+            raise RuntimeError('Cannot save corrected image, doesn\'t exist yet!')
         if filename==None:
             filename = self.outfilebasename + '.refpixcorr.fits'
         rmfile(filename)
-        print 'Saving corrected image',filename
+        print('Saving corrected image',filename)
         pyfits.writeto(filename,self.data,self.hdr,clobber=True)
         
     def mkframeresetcorrection(self,data,boxsize=10,savediffimflag=False,testflag=False):
@@ -736,7 +736,7 @@ if __name__=='__main__':
 
         refpixcorr_outputfilename = refpixcorr.outfilebasename + '.refpixcorr.fits'
         if not options.force and os.path.isfile(refpixcorr_outputfilename):
-            print '%s already exist, skipping recreating it!! (use -f to force recreation...)' % refpixcorr_outputfilename
+            print('%s already exist, skipping recreating it!! (use -f to force recreation...)' % refpixcorr_outputfilename)
             continue
 
         biasdriftvecfilename = refpixcorr.biasdriftvecfilename()
@@ -748,7 +748,7 @@ if __name__=='__main__':
         if not options.skipcorrect4framereset:
             refpixcorr.correct4framereset(refpixcorr.data)
         else:
-            print 'WARNING: The correction for the bias offset is skipped!!'
+            print('WARNING: The correction for the bias offset is skipped!!')
 
         refpixcorr.mkdiffim(savediffimflag=options.savediffim)
 
@@ -768,7 +768,7 @@ if __name__=='__main__':
         if not options.skipcorrect4framereset:
             refpixcorr.correct4framereset(refpixcorr.datacorr)
         else:
-            print 'WARNING: The correction for the bias offset is skipped!!'
+            print('WARNING: The correction for the bias offset is skipped!!')
 
         if options.savediffim:
             refpixcorr.mkdiffimcorr(savediffimflag=options.savediffim)

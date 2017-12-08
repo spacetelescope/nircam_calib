@@ -79,7 +79,6 @@ class Schema():
                                 self.metadict['meta.'+key+'.'+l2key] = l2dict[l2key]['fits_keyword']
 
 
-
     def add_options(self,parser=None,usage=None):
         if parser is None:
             parser = argparse.ArgumentParser(usage=usage,description='Find required metadata')
