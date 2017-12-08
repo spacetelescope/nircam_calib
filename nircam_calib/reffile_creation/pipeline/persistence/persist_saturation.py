@@ -15,7 +15,7 @@ script:
 
 The steps in this script are:
 
-    1.) read in a list of uncalibrated exposures to use
+    1.) read in a list of uncalibrated exposures and run pipeline thru linearity
     2.) use signal difference between consecutive reads to find saturation
     3.) take average of saturated reads as hard saturation
     4.) when final saturation levels are found, average together values
@@ -48,6 +48,7 @@ from astropy.stats import sigma_clip
 from jwst.dq_init import DQInitStep
 from jwst.superbias import SuperBiasStep
 from jwst.refpix import RefPixStep
+from jwst.linearity import LinearityStep
 from jwst.datamodels import PersistenceSatModel
 
 DET_NUM = {'NRCA1': 17004,
@@ -285,6 +286,7 @@ class MakeSatRef:
         model.history.append('     DQ Initialization')
         model.history.append('     Superbias subtraction')
         model.history.append('     Reference pixel correction')
+        model.history.append('     Non-linearity correction')
         model.history.append('2. Use delta(signal) to find hard saturation,')
         model.history.append('   since delta(signal) ~ 0 when saturated.')
         model.history.append('3. Average samples at hard saturation.')
@@ -378,13 +380,15 @@ class MakeSatRef:
             bpm = DQInitStep.call(file)
             sup = SuperBiasStep.call(bpm)
             ref = RefPixStep.call(sup, odd_even_rows=False)
+            lin = LinearityStep.call(ref)
 
             if self.intermediates:
                 sup.save(file[:-5]+'_dq_superbias.fits')
                 ref.save(file[:-5]+'_dq_superbias_refpix.fits')
+                lin.save(file[:-5]+'_dq_superbias_refpix_linearity.fits')
 
             # Grab the name of the mask file used from the headers
-            bpmcalfile = ref.meta.ref_file.mask.name
+            bpmcalfile = lin.meta.ref_file.mask.name
             if 'crds' in bpmcalfile:
                 jwst = bpmcalfile.find('jwst')
                 bpmfile = '/grp/crds/cache/references/jwst/'+bpmcalfile[jwst:]
@@ -393,11 +397,11 @@ class MakeSatRef:
 
             # Get data values
             mask = fits.getdata(bpmfile, 1)
-            data = ref.data
-            xstart = ref.meta.subarray.xstart
-            ystart = ref.meta.subarray.ystart
-            xend = ref.meta.subarray.xsize
-            yend = ref.meta.subarray.ysize
+            data = lin.data
+            xstart = lin.meta.subarray.xstart
+            ystart = lin.meta.subarray.ystart
+            xend = lin.meta.subarray.xsize
+            yend = lin.meta.subarray.ysize
 
             # Loop over pixel combinations for given array (no ref pixels).
             for i, j in itertools.product(np.arange(xstart+3, xend-4),
@@ -511,6 +515,7 @@ class MakeSatRef:
         z0.header['S_DQINIT'] = ('COMPLETE', 'Data Quality Initialization')
         z0.header['S_SUPERB'] = ('COMPLETE', 'Superbias Subtraction')
         z0.header['S_REFPIX'] = ('COMPLETE', 'Reference Pixel Correction')
+        z0.header['S_LINEAR'] = ('COMPLETE', 'Non-Linearity Correction')
         newhdu = fits.HDUList([z0, z1, z2, z3])
         newhdu.writeto(outfile, overwrite=True)
 
