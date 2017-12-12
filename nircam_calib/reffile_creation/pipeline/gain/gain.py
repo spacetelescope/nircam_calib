@@ -19,10 +19,10 @@ import numpy as np
 import scipy
 from scipy import ndimage
 from astropy.io import fits
-from refpixcorr import refpixcorrclass,frameresetclass
-from sigmacut import calcaverageclass
-from texttable import txttableclass
-from tools import rmfile
+from .refpixcorr import refpixcorrclass,frameresetclass
+from ....tools.math.sigmacut import calcaverageclass
+from ....tools.misc.texttable import txttableclass
+from ....tools.misc.tools import rmfile
 
 
 lowedir = '/grp/jwst/wit/nircam/hilbert/epoxy_thinned_area_definition/'
@@ -1181,13 +1181,20 @@ class Gainimclass:
         return ts
                     
 
-    def gainim(self,infile1,infile2,darks4readnoiselist=None,pattern='.fits',format='g%03d',imtype=None,
-               skiprefpixcorr=False,
-               refpixboxsize=12,
-               skipcorrect4framereset=False):
+    #def gainim(self,infile1,infile2,darks4readnoiselist=None,pattern='.fits',format='g%03d',imtype=None,
+    #           skiprefpixcorr=False,
+    #           refpixboxsize=12,
+    #           skipcorrect4framereset=False):
 
+    def gainim(self,infile1,infile2,pattern='.fits',format='g%03d',imtype=None,refpixboxsize=12):
+        # Lazy updates to allow for more use of class variables rather than
+        # needing so many in the function definition
+        skiprefpixcorr = self.skiprefpixcorr
+        skipcorrect4framereset = self.skipcorrect4framereset
+        darks4readnoiselist = self.darks
+        
         # Get the proper darks
-        if self.darks != (None,None):
+        if self.darks is not None:
             darkfilelist = [os.path.abspath(self.darks[0]),os.path.abspath(self.darks[1])]
             print('Using the following dark frames:',darkfilelist)
         elif self.autodark4readnoise:
@@ -1203,7 +1210,7 @@ class Gainimclass:
         else:
             darkfilelist = None
         
-        if darks4readnoiselist!=None:
+        if darks4readnoiselist is not None:
             self.readnoisemethod='doublediff'
         else:
             self.readnoisemethod='dsub12'
@@ -1260,7 +1267,7 @@ class Gainimclass:
         self.bpmmask = self.mkbpmmask(self.data1,self.hdr1,self.boxmap,self.box_centers)
 
         # get the readnoise from the dark frames if wanted...
-        if darks4readnoiselist!=None:
+        if darks4readnoiselist is not None:
             #self.darks4readnoise(darks4readnoiselist,(xmin,xmax,boxsize),
             #                     (ymin,ymax,boxsize),mask=self.bpmmask,
             #                     gmax=self.gmax4dark,skiprefpixcorr=skiprefpixcorr,
@@ -1287,7 +1294,8 @@ class Gainimclass:
         else:
             gmax = min(self.gmax,Ngroups)
 
-        print("Performing refpix correction")
+        if not skiprefpixcorr:
+            print("Performing refpix correction")
         self.make_refpixcorr(data=self.data1,gmax=gmax,skiprefpixcorr=skiprefpixcorr,
                              refpixboxsize=refpixboxsize,
                              skipcorrect4framereset=skipcorrect4framereset)
