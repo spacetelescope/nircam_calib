@@ -1,0 +1,4 @@
+index    file_type    filename              req_steps   
+1         gain      something_uncal.fits     bpm,sat
+2         gain      another_uncal.fits       bpm,sat
+3        readnoise  something_uncal.fits     bpm,sat,superbias
