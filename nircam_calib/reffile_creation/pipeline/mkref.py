@@ -181,6 +181,7 @@ class mkrefclass:
         return(0)
     
     def checkssbinputfiles(self,reftype,args):
+        print reftype,args
         print "### checkssbinputfiles: not yet implemented!!"
 
     def call_algorithm(self,reftype,args):

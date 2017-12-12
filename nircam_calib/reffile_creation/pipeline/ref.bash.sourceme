@@ -20,7 +20,7 @@ if [ -z ${USER+x} ]; then
 fi
 
 if [[ $HOSTNAME =~ arminmac* ]] ; then
-      export JWST_MKREFS_SRCDIR=/Users/arest/nircam/nircam_calib/reffile_creation/pipeline
+      export JWST_MKREFS_SRCDIR=/Users/arest/nircam/nircam_calib/nircam_calib/reffile_creation/pipeline
       export JWST_MKREFS_DATADIR=/Users/arest/nircam/refindir
       export JWST_MKREFS_OUTDIR=/Users/arest/nircam/refoutdir
 elif [[ $HOSTNAME =~ armin.stsci.edu ]] ; then
@@ -35,8 +35,8 @@ fi
 
 export JWST_MKREFS_CONFIGFILE=$JWST_MKREFS_SRCDIR/mkrefs.cfg
 
+export PATH="${JWST_MKREFS_SRCDIR}:${PATH}"
+
 export PS1="\u@\h(mkrefs,$JWST_MKREFS_INSTRUMENT)% "
 
 alias cdsrc='cd $JWST_MKREFS_SRCDIR'
-alias cdin='cd $JWST_MKREFS_DATADIR'
-alias cdout='cd $JWST_MKREFS_OUTDIR'

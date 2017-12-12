@@ -35,6 +35,7 @@ class mkrefsclass(astrotableclass):
         self.cfg = None
 
         self.imtable = astrotableclass()
+        self.images4ssb = astrotableclass()
         self.darks = None
         self.flats = None
         
@@ -65,6 +66,64 @@ class mkrefsclass(astrotableclass):
             raise RuntimeError,"Something went wrong when loading config files!"
         return(0)
     
+    def collapse_imagelist(self,imagelist):
+        '''
+        remove the .fits ending, and then look for the unique basenames
+        '''
+
+        print imagelist
+        if imagelist==None or len(imagelist)==0:
+            print 'Nothing to do, no images!!!'
+            return(imagelist)
+
+        subpattern = re.compile('\.fits$')
+        skipdict = {}
+    
+        # get rid of the 'fits' at the end of the filenames
+        for i in xrange(len(imagelist)):
+            imagelist[i]=subpattern.sub('.',imagelist[i])
+            skipdict[imagelist[i]]=False
+
+
+        for i in xrange(len(imagelist)):
+            
+            # if skipdict[imagelist[i]], then this image is already determined to be not one of the basenames, so skip it!
+            if skipdict[imagelist[i]]:
+                continue
+            
+            for s in xrange(len(imagelist)):
+                if i==s: continue
+                
+                # if skipdict[imagelist[i]], then this image is already determined to be not one of the basenames, so skip it!
+                if skipdict[imagelist[s]]:
+                    #print 'SKIPPED FROM BEFORE',imagelist[s]
+                    continue
+
+                commonrootfilename = os.path.commonprefix([imagelist[i],imagelist[s]])
+                if commonrootfilename == imagelist[i]:
+                    if commonrootfilename == imagelist[s]:
+                        raise RuntimeError,"%s=%s=%s, that should not happen!!!" % (commonrootfilename,imagelist[i],imagelist[s])
+                    # if the commonrootfilename is equal to imagelist[i], then imagelist[s] must be a derivative!
+                    skipdict[imagelist[s]]=True
+                    #print 'iiiiiiiiiii skip',imagelist[s]
+                if commonrootfilename == imagelist[s]:
+                    if commonrootfilename == imagelist[i]:
+                        raise RuntimeError,"%s=%s=%s, that should not happen!!!" % (commonrootfilename,imagelist[i],imagelist[s])
+                    # if the commonrootfilename is equal to imagelist[s], then imagelist[i] must be a derivative!
+                    skipdict[imagelist[i]]=True
+                    #print 'sssssssssss skip',imagelist[i]
+                
+        # only keep the ones that are not skipped, and add the 'fits' back to it!!
+        collapsed_imagelist=[]            
+        for i in xrange(len(imagelist)):
+            #print 'BBB',imagelist[i]+'fits',skipdict[imagelist[i]]
+            if not skipdict[imagelist[i]]:
+                collapsed_imagelist.append(imagelist[i]+'fits')
+            
+        #print collapsed_imagelist
+
+        return(collapsed_imagelist)
+        
     def parse_reftypes_images(self,reftypes_and_imagelist):
         reftypelist = []
         imagelist = []
@@ -76,6 +135,8 @@ class mkrefsclass(astrotableclass):
                     raise RuntimeError,"ERROR: file %s does not exist, thus not a viable input file" % s
                 imagelist.append(s)
 
+        imagelist = self.collapse_imagelist(imagelist)
+              
         return(reftypelist,imagelist)
 
     def getimtypes(self):
@@ -99,6 +160,7 @@ class mkrefsclass(astrotableclass):
         
         #self.imtable['fitsfile'].format('%s')
         self.imtable.t['fitsfile']=imagelist
+        self.imtable.t['fitsID']=range(len(imagelist))
         self.imtable.t['imtype']=None
         self.imtable.t['skip']=False
         self.imtable.fitsheader2table('fitsfile',
@@ -106,7 +168,7 @@ class mkrefsclass(astrotableclass):
                                       optionalfitskey=self.cfg.params['optionalfitskeys'],
                                       raiseError=False,skipcolname='skip')
         self.imtable.dateobs2mjd('DATE-OBS','MJD-OBS',timeobscol='TIME-OBS')
-
+            
         self.getimtypes()
 
         self.darks = self.imtable.t[np.where(self.imtable.t['imtype']=='dark')]
@@ -160,14 +222,14 @@ class mkrefsclass(astrotableclass):
         if imtypes == 'D':
             imagesets = self.getDlist(detector)
         else:
-            raise RuntimeError,"ERROR: imtypes=%s not yet implemented!"
+            raise RuntimeError,"ERROR: imtypes=%s not yet implemented!" % imtypes
         return(imagesets)
     
     def cmds4mkref(self,optionalargs):
 
         if self.verbose:
             print '##################################\n### Constructing commands'
-
+            
         for reftype in self.reftypelist:
 
             if self.verbose:
@@ -202,7 +264,7 @@ class mkrefsclass(astrotableclass):
         if self.verbose>1:
             print 'Commands constructed:'
             print self.cmdtable.t
-
+        
 
     def submitbatch(self):
         print "### submitbatch: NOT YET IMPLEMENTED!!!"
@@ -246,6 +308,8 @@ if __name__=='__main__':
 
     mkrefs.cmds4mkref(optionalargs)
 
+    
+    
     if args.batchmode:
         mkrefs.submitbatch()
     else:

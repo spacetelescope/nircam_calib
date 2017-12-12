@@ -358,7 +358,7 @@ class astrotableclass:
     def dateobs2mjd(self,dateobscol,mjdcol,timeobscol=None):
         if not (mjdcol in self.t.colnames):
             self.t[mjdcol]=None
-
+            
         if timeobscol!=None:
             dateobslist = list(self.t[dateobscol]+'T'+self.t[timeobscol])
         else:
