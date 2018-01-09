@@ -154,6 +154,7 @@ class Gainimclass:
         gainfilename = self.outfilebasename+'.gain.%s.fits' % imtype
         phdu = fits.PrimaryHDU(data=None)
         hdu_gain = fits.ImageHDU(gainim,name='gain')
+        phdu = self.set_header_info(phdu)
         hdu_gain_err = fits.ImageHDU(gainim_err,name='gain_err')
         hdulist = fits.HDUList([phdu,hdu_gain,hdu_gain_err])
         #print('Saving ',gainfilename)
@@ -163,6 +164,21 @@ class Gainimclass:
         del gainim, gainim_err, hdulist, hdu_gain, hdu_gain_err
 
 
+    def set_header_info(self,hdu):
+        '''
+        Populate necessary header information in the output file
+        '''
+        hdu.header['FILETYPE'] = 'GAIN'
+        hdu.header['DETECTOR'] = self.hdr1['DETECTOR']
+        hdu.header['INSTRUME'] = 'NIRCAM'
+        hdu.header['TELESCOP'] = 'JWST'
+        hdu.header['FLATFIL1'] = self.flatfile1
+        hdu.header['FLATFIL2'] = self.flatfile2
+        hdu.header['DARKFIL1'] = self.darks[0]
+        hdu.header['DARKFIL2'] = self.darks[1]
+        return hdu
+
+               
     def correct_stdev2_with_rdnoiseterms(self,boxmap,box_location,tsubik,tsubg0,tdsub1,
                                          tdsub2,tdsubij,Smean_max=None,Pmax=20.0,Nmin=3):
 
@@ -1194,7 +1210,7 @@ class Gainimclass:
         darks4readnoiselist = self.darks
         
         # Get the proper darks
-        if self.darks is not None:
+        if self.darks[0] is not None:
             darkfilelist = [os.path.abspath(self.darks[0]),os.path.abspath(self.darks[1])]
             print('Using the following dark frames:',darkfilelist)
         elif self.autodark4readnoise:
@@ -1210,7 +1226,7 @@ class Gainimclass:
         else:
             darkfilelist = None
         
-        if darks4readnoiselist is not None:
+        if darks4readnoiselist[0] is not None:
             self.readnoisemethod='doublediff'
         else:
             self.readnoisemethod='dsub12'
@@ -1267,7 +1283,7 @@ class Gainimclass:
         self.bpmmask = self.mkbpmmask(self.data1,self.hdr1,self.boxmap,self.box_centers)
 
         # get the readnoise from the dark frames if wanted...
-        if darks4readnoiselist is not None:
+        if darks4readnoiselist[0] is not None:
             #self.darks4readnoise(darks4readnoiselist,(xmin,xmax,boxsize),
             #                     (ymin,ymax,boxsize),mask=self.bpmmask,
             #                     gmax=self.gmax4dark,skiprefpixcorr=skiprefpixcorr,
@@ -1476,7 +1492,7 @@ class Gainimclass:
         
 if __name__=='__main__':
 
-    usagestring='USAGE: calcgainim.py flatfilename1 flatfilename2'
+    usagestring='USAGE: gain.py flatfilename1 flatfilename2'
 
     g = gainimclass()
     parser = g.add_options(usage = usagestring)
