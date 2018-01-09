@@ -261,8 +261,8 @@ class yamlcfgclass:
 #http://docs.astropy.org/en/stable/table/index.html#astropy-table
 #table groups!! http://docs.astropy.org/en/stable/table/operations.html#table-operations
 class astrotableclass:
-    def __init__(self):
-        self.t = astropy.table.Table()
+    def __init__(self, **kwargs):
+        self.t = astropy.table.Table(**kwargs)
         self.verbose = 0
         
     def load(self,filename,namesMapping={},formatMapping={},**kwargs):
@@ -355,9 +355,12 @@ class astrotableclass:
                     else:
                         self.t[fitskey][rowindex]=None
 
-    def dateobs2mjd(self,dateobscol,mjdcol,timeobscol=None):
+    def dateobs2mjd(self,dateobscol,mjdcol,mjdobscol=None,timeobscol=None):
         if not (mjdcol in self.t.colnames):
             self.t[mjdcol]=None
+
+        print self.t[dateobscol]
+        print self.t[timeobscol]
             
         if timeobscol!=None:
             dateobslist = list(self.t[dateobscol]+'T'+self.t[timeobscol])
