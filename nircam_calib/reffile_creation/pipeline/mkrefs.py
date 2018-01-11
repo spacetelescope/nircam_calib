@@ -8,6 +8,7 @@ import sys, os,re,types,glob
 import scipy,argparse
 import numpy as np
 import astropy.io.fits as fits
+import astropy
 
 # get the root dir of the code. This is needed only if the scripts are not installed as a module!
 if 'JWST_MKREFS_SRCDIR' in os.environ:
@@ -134,7 +135,7 @@ class mkrefsclass(astrotableclass):
         
         #self.imtable['fitsfile'].format('%s')
         self.imtable.t['fitsfile']=imagelist
-        self.imtable.t['fitsID']=range(len(imagelist))
+        self.imtable.t['imID']=range(len(imagelist))
         self.imtable.t['imtype']=None
         self.imtable.t['skip']=False
 
@@ -217,14 +218,14 @@ class mkrefsclass(astrotableclass):
             print 'Possible %d Darks for detector %s' % (len(dindex4detector),detector)
             print self.imtable.t[dindex4detector]
 
-        #D = astrotableclass(names=('D1index','D1fitsID'),dtype=('i4', 'i4'))
+        #D = astrotableclass(names=('D1index','D1imID'),dtype=('i4', 'i4'))
         D = astrotableclass()
         D.t['D1index']=dindex4detector
-        D.t['D1fitsID']=self.imtable.t['fitsID'][dindex4detector]
-        D.t['D1index','D1fitsID'].format='%d'
+        D.t['D1imID']=self.imtable.t['imID'][dindex4detector]
+        D.t['D1index','D1imID'].format='%d'
         #print D.t
         #sys.exit(0)
-        return(D)
+        return(D,('D1',))
             
     
     def getDDlist(self,detector,max_Delta_MJD=None):
@@ -243,25 +244,25 @@ class mkrefsclass(astrotableclass):
             print 'Possible %d Darks for detector %s' % (len(dindex4detector),detector)
             print self.imtable.t[dindex4detector]
 
-        DD = astrotableclass(names=('D1index','D2index','D1fitsID','D2fitsID'),dtype=('i4', 'i4', 'i4', 'i4'))
+        DD = astrotableclass(names=('D1index','D2index','D1imID','D2imID'),dtype=('i4', 'i4', 'i4', 'i4'))
         i=0
         while i<len(dindex4detector)-1:
             if max_Delta_MJD!=None:
-                if self.verbose>2: print 'Checking if fitsID=%d and %d can be DD' % (self.imtable.t['fitsID'][dindex4detector[i]],self.imtable.t['fitsID'][dindex4detector[i+1]])
+                if self.verbose>2: print 'Checking if imID=%d and %d can be DD' % (self.imtable.t['imID'][dindex4detector[i]],self.imtable.t['imID'][dindex4detector[i+1]])
                 dMJD =self.imtable.t['MJD'][dindex4detector[i+1]]-self.imtable.t['MJD'][dindex4detector[i]]
                 print 'dMJD:',dMJD
                 if dMJD>max_Delta_MJD:
                     if self.verbose>2:
-                        print 'Skipping fitsID=%d (MJD=%f) since fitsID=%d is not within timelimit (Delta MJD = %f>%f)!' % (self.imtable.t['fitsID'][dindex4detector[i]],self.imtable.t['MJD'][i],self.imtable.t['fitsID'][dindex4detector[i+1]],dMJD,max_Delta_MJD)
+                        print 'Skipping imID=%d (MJD=%f) since imID=%d is not within timelimit (Delta MJD = %f>%f)!' % (self.imtable.t['imID'][dindex4detector[i]],self.imtable.t['MJD'][i],self.imtable.t['imID'][dindex4detector[i+1]],dMJD,max_Delta_MJD)
                     i+=1
                     continue
-            if self.verbose>1: print 'Adding DD pair with fitsID=%d and %d' % (self.imtable.t['fitsID'][dindex4detector[i]],self.imtable.t['fitsID'][dindex4detector[i+1]])
-            DD.t.add_row({'D1index':dindex4detector[i],'D2index':dindex4detector[i+1],'D1fitsID':self.imtable.t['fitsID'][dindex4detector[i]],'D2fitsID':self.imtable.t['fitsID'][dindex4detector[i+1]]})
+            if self.verbose>1: print 'Adding DD pair with imID=%d and %d' % (self.imtable.t['imID'][dindex4detector[i]],self.imtable.t['imID'][dindex4detector[i+1]])
+            DD.t.add_row({'D1index':dindex4detector[i],'D2index':dindex4detector[i+1],'D1imID':self.imtable.t['imID'][dindex4detector[i]],'D2imID':self.imtable.t['imID'][dindex4detector[i+1]]})
             i+=2
 
         if self.verbose>2:
             print DD.t
-        return(DD)
+        return(DD,('D1','D2'))
     
     def getFFlist(self,detector,max_Delta_MJD=None):
         '''
@@ -279,40 +280,40 @@ class mkrefsclass(astrotableclass):
             print 'Possible %d Flats for detector %s' % (len(findex4detector),detector)
             print self.imtable.t[findex4detector]
         
-        FF = astrotableclass(names=('F1index','F2index','F1fitsID','F2fitsID'),dtype=('i4', 'i4', 'i4', 'i4'))
+        FF = astrotableclass(names=('F1index','F2index','F1imID','F2imID'),dtype=('i4', 'i4', 'i4', 'i4'))
         i=0
         while i<len(findex4detector)-1:
             if max_Delta_MJD!=None:
-                if self.verbose>2: print 'Checking if fitsID=%d and %d can be FF' % (self.imtable.t['fitsID'][findex4detector[i]],self.imtable.t['fitsID'][findex4detector[i+1]])
+                if self.verbose>2: print 'Checking if imID=%d and %d can be FF' % (self.imtable.t['imID'][findex4detector[i]],self.imtable.t['imID'][findex4detector[i+1]])
                 dMJD =self.imtable.t['MJD'][findex4detector[i+1]]-self.imtable.t['MJD'][findex4detector[i]]
                 print 'dMJD:',dMJD
                 if dMJD>max_Delta_MJD:
                     if self.verbose>2:
-                        print 'Skipping fitsID=%d (MJD=%f) since fitsID=%d is not within timelimit (Delta MJD = %f>%f)!' % (self.imtable.t['fitsID'][findex4detector[i]],self.imtable.t['MJD'][i],self.imtable.t['fitsID'][findex4detector[i+1]],dMJD,max_Delta_MJD)
+                        print 'Skipping imID=%d (MJD=%f) since imID=%d is not within timelimit (Delta MJD = %f>%f)!' % (self.imtable.t['imID'][findex4detector[i]],self.imtable.t['MJD'][i],self.imtable.t['imID'][findex4detector[i+1]],dMJD,max_Delta_MJD)
                     i+=1
                     continue
-            if self.verbose>1: print 'Adding FF pair with fitsID=%d and %d' % (self.imtable.t['fitsID'][findex4detector[i]],self.imtable.t['fitsID'][findex4detector[i+1]])
-            FF.t.add_row({'F1index':findex4detector[i],'F2index':findex4detector[i+1],'F1fitsID':self.imtable.t['fitsID'][findex4detector[i]],'F2fitsID':self.imtable.t['fitsID'][findex4detector[i+1]]})
+            if self.verbose>1: print 'Adding FF pair with imID=%d and %d' % (self.imtable.t['imID'][findex4detector[i]],self.imtable.t['imID'][findex4detector[i+1]])
+            FF.t.add_row({'F1index':findex4detector[i],'F2index':findex4detector[i+1],'F1imID':self.imtable.t['imID'][findex4detector[i]],'F2imID':self.imtable.t['imID'][findex4detector[i+1]]})
             i+=2
         
         if self.verbose>2:
             print FF.t
-        return(FF)
+        return(FF,('F1','F2'))
     
     def getDDFFlist(self,detector,DD_max_Delta_MJD=None,FF_max_Delta_MJD=None,DDFF_max_Delta_MJD=None):
         '''
         returns list of Flat-Flat pair indeces, where the indices refer to the self.imtable table
         '''
         if self.verbose>0: print '\n### Getting DDFF list'
-        DD = self.getDDlist(detector,max_Delta_MJD=DD_max_Delta_MJD)
-        FF = self.getFFlist(detector,max_Delta_MJD=FF_max_Delta_MJD)
+        DD,DDimtypes = self.getDDlist(detector,max_Delta_MJD=DD_max_Delta_MJD)
+        FF,FFimtypes = self.getFFlist(detector,max_Delta_MJD=FF_max_Delta_MJD)
         if self.verbose>0: print '### DD and FF lists created, no matching them!!!'
         
-        DDFF = astrotableclass(names=('F1index','F2index','F1fitsID','F2fitsID','D1index','D2index','D1fitsID','D2fitsID'),dtype=('i4', 'i4', 'i4', 'i4','i4', 'i4', 'i4', 'i4'))
+        DDFF = astrotableclass(names=('F1index','F2index','F1imID','F2imID','D1index','D2index','D1imID','D2imID'),dtype=('i4', 'i4', 'i4', 'i4','i4', 'i4', 'i4', 'i4'))
         ddcount = np.zeros(len(DD.t))
 
         for f in xrange(len(FF.t)):
-            if self.verbose>2: print '# Finding DD pair for FF pair with fitsID=%d and %d' % (FF.t['F1fitsID'][f],FF.t['F2fitsID'][f])
+            if self.verbose>2: print '# Finding DD pair for FF pair with imID=%d and %d' % (FF.t['F1imID'][f],FF.t['F2imID'][f])
             if DDFF_max_Delta_MJD!=None:
                 FF_MJDmin = np.amin(np.array((self.imtable.t['MJD'][FF.t['F1index'][f]],self.imtable.t['MJD'][FF.t['F2index'][f]])))
                 FF_MJDmax = np.amax(np.array((self.imtable.t['MJD'][FF.t['F1index'][f]],self.imtable.t['MJD'][FF.t['F2index'][f]])))
@@ -323,14 +324,14 @@ class mkrefsclass(astrotableclass):
             for d in  xrange(len(DD.t)):
                 if ddcountmin==None or ddcount[d]<ddcountmin:
                     if DDFF_max_Delta_MJD!=None:
-                        if self.verbose>2: print '# Testing DD pair with fitsID=%d and %d' % (DD.t['D1fitsID'][d],DD.t['D2fitsID'][d])
+                        if self.verbose>2: print '# Testing DD pair with imID=%d and %d' % (DD.t['D1imID'][d],DD.t['D2imID'][d])
                         DD_MJDmin = np.amin(np.array((self.imtable.t['MJD'][DD.t['D1index'][d]],self.imtable.t['MJD'][DD.t['D2index'][d]])))
                         DD_MJDmax = np.amax(np.array((self.imtable.t['MJD'][DD.t['D1index'][d]],self.imtable.t['MJD'][DD.t['D2index'][d]])))
                         print 'DD MJD range',DD_MJDmin,DD_MJDmax
                         dMJD = np.fabs([DD_MJDmax-FF_MJDmin,DD_MJDmin-FF_MJDmax,DD_MJDmax-FF_MJDmax,DD_MJDmin-FF_MJDmin])
                         max_dMJD = np.amax(dMJD)
                         if max_dMJD > DDFF_max_Delta_MJD:
-                            print 'DD pair with fitsID=%d and %d cannot be used, dMJD=%f>%f' % (DD.t['D1fitsID'][d],DD.t['D2fitsID'][d],max_dMJD,DDFF_max_Delta_MJD)
+                            print 'DD pair with imID=%d and %d cannot be used, dMJD=%f>%f' % (DD.t['D1imID'][d],DD.t['D2imID'][d],max_dMJD,DDFF_max_Delta_MJD)
                             continue
                     ddcountmin=ddcount[d]
                     d_best = d
@@ -339,37 +340,110 @@ class mkrefsclass(astrotableclass):
                 print 'SKIPPING following FF pair since there is no matching DD pair!'
                 print FF.t[f]
             else:
-                if self.verbose>2: print 'SUCCESS! DD pair with fitsID %d and %d found for FF pair with fitsID %d and %d' % (DD.t['D1fitsID'][d_best],DD.t['D2fitsID'][d_best],FF.t['F1fitsID'][f],FF.t['F2fitsID'][f])
+                if self.verbose>2: print 'SUCCESS! DD pair with imID %d and %d found for FF pair with imID %d and %d' % (DD.t['D1imID'][d_best],DD.t['D2imID'][d_best],FF.t['F1imID'][f],FF.t['F2imID'][f])
                 ddcount[d_best]+=1
                 DDFF.t.add_row({'D1index':DD.t['D1index'][d_best],
                                 'D2index':DD.t['D2index'][d_best],
-                                'D1fitsID':DD.t['D1fitsID'][d_best],
-                                'D2fitsID':DD.t['D2fitsID'][d_best],
+                                'D1imID':DD.t['D1imID'][d_best],
+                                'D2imID':DD.t['D2imID'][d_best],
                                 'F1index':FF.t['F1index'][f],
                                 'F2index':FF.t['F2index'][f],
-                                'F1fitsID':FF.t['F1fitsID'][f],
-                                'F2fitsID':FF.t['F2fitsID'][f]})
+                                'F1imID':FF.t['F1imID'][f],
+                                'F2imID':FF.t['F2imID'][f]})
                     
                   
         print DDFF.t
-        return(DDFF)
+        return(DDFF,('D1','D2','F1','F2'))
         
     def get_inputimage_sets(self,reftype,detector,DD_max_Delta_MJD=None,FF_max_Delta_MJD=None,DDFF_max_Delta_MJD=None):
         imtypes = self.cfg.params[reftype]['imtypes']
         imagesets = []
         if imtypes == 'D':
-            imagesets = self.getDlist(detector)
+            imagesets,imagelabels = self.getDlist(detector)
         elif imtypes == 'DD':
-            imagesets = self.getDDlist(detector,max_Delta_MJD=DD_max_Delta_MJD)
+            imagesets,imagelabels = self.getDDlist(detector,max_Delta_MJD=DD_max_Delta_MJD)
         elif imtypes == 'FF':
-            imagesets = self.getFFlist(detector,max_Delta_MJD=FF_max_Delta_MJD)
+            imagesets,imagelabels = self.getFFlist(detector,max_Delta_MJD=FF_max_Delta_MJD)
         elif imtypes == 'DDFF' or imtypes == 'FFDD':
-            imagesets = self.getDDFFlist(detector,DD_max_Delta_MJD=DD_max_Delta_MJD,FF_max_Delta_MJD=FF_max_Delta_MJD,DDFF_max_Delta_MJD=DDFF_max_Delta_MJD)
+            imagesets,imagelabels = self.getDDFFlist(detector,DD_max_Delta_MJD=DD_max_Delta_MJD,FF_max_Delta_MJD=FF_max_Delta_MJD,DDFF_max_Delta_MJD=DDFF_max_Delta_MJD)
         else:
             raise RuntimeError,"ERROR: imtypes=%s not yet implemented!" % imtypes
-        return(imagesets)
+        return(imagesets,imagelabels)
     
+
     def cmds4mkref(self,optionalargs):
+        '''
+        Construct the reftype commands, get the input files 
+        '''
+        if self.verbose:
+            print '\n##################################\n### Constructing commands\n##################################'
+
+        # this is just to get the correct dtype for the reftype  columns
+        dummyreftype = astrotableclass()
+        dummyreftype.t['reftype'] = self.reftypelist
+        dummyreftype.t['ssbsteps'] = [self.cfg.params[reftype]['ssbsteps'] for reftype in self.reftypelist]
+        
+        self.cmdtable = astrotableclass(names=('reftype','detector','cmdID','Nim'),dtype=(dummyreftype.t['reftype'].dtype, self.imtable.t['DETECTOR'].dtype, 'i8', 'i8'))
+        #self.cmdtable = astrotableclass(names=('reftype','detector','cmdID','Nim'))
+        self.cmdtable.t['cmdID','Nim'].format='%5d'
+        self.cmdtable.t['reftype','detector'].format='%s'
+        self.inputimagestable = astrotableclass(names=('cmdID','reftype','imlabel','imtype','detector','ssbsteps','imindex','imID','MJD','fitsfile'),
+                                                dtype=('i8',dummyreftype.t['reftype'].dtype,'S40',self.imtable.t['imtype'].dtype,self.imtable.t['DETECTOR'].dtype,dummyreftype.t['ssbsteps'].dtype,
+                                                       'i8','i8','f8',self.imtable.t['fitsfile'].dtype))
+        self.inputimagestable.t['cmdID','imindex','imID'].format= '%5d'
+        self.inputimagestable.t['MJD'].format='%.8f'
+        
+        cmdID = 0
+        for reftype in self.reftypelist:
+
+            print 'SSB steps for reftype %s: %s' % (reftype,self.cfg.params[reftype]['ssbsteps'])
+            #continue
+        
+            counter=0
+            for detector in self.detectors:
+                if self.verbose: print '### Constructing %s commands for detector %s' % (reftype,detector)
+                inputimagesets,inputimagelabels = self.get_inputimage_sets(reftype,detector,
+                                                                          DD_max_Delta_MJD=self.cfg.params['DD']['max_Delta_MJD'],
+                                                                          FF_max_Delta_MJD=self.cfg.params['FF']['max_Delta_MJD'],
+                                                                          DDFF_max_Delta_MJD=self.cfg.params['DDFF']['max_Delta_MJD'])
+                
+                if self.verbose: print '### %d image sets for %s for detector %s' % (len(inputimagesets.t),reftype,detector)
+                if self.verbose>1: print inputimagesets.t
+                for i in xrange(len(inputimagesets.t)):
+                    if self.verbose>1: print 'image set index %d' %i
+                    for inputimagelabel in inputimagelabels:
+                        
+                        # This is the index to the image in imtable
+                        imindex = inputimagesets.t['%sindex' % inputimagelabel][i]
+
+                        # sanity test: imindex and imID need to agree!!                        
+                        if inputimagesets.t['%simID' % inputimagelabel][i] != self.imtable.t['imID'][imindex]:
+                            raise RuntimeError,'BUG!!! This should not happen! the imIDs %d and %d need to match!' % (inputimagesets.t['%simID' % inputimagelabel][i], self.imtable.t['imID'][imindex])
+
+                        if self.verbose>3: 
+                            print self.imtable.t[inputimagesets.t['%sindex' % inputimagelabel][i]]
+                                                      
+
+                        dict2add = {'cmdID':cmdID,'imindex':imindex,'reftype':reftype,'detector':detector,'imlabel':inputimagelabel,'ssbsteps':self.cfg.params[reftype]['ssbsteps']}
+                        for key in ['fitsfile','imID','imtype','MJD']:
+                            dict2add[key]=self.imtable.t[key][imindex]
+                        self.inputimagestable.t.add_row(dict2add)
+                        
+                    self.cmdtable.t.add_row({'reftype':reftype,'detector':detector,'cmdID':cmdID,'Nim':len(inputimagelabels)})
+                    cmdID+=1
+        print '\n### COMMANDS:'
+        print self.cmdtable.t
+        print '\n### INPUT FILES:'
+        print self.inputimagestable.t
+
+        print 'BRYAN: here we call your script to get the outoput filenames and the commands to run SSB!'
+        print 'input is the self.inputimagestable'
+        print 'What we need is: ssb-reduced input filename, a flag if this ssb-reduced input file already exists, and the commands to reduce the inputfilename to the ssb stage it needs to be run'
+        print 'ssbsteps: here we have to figure out what nomenclature to use to define which ssb steps to run. As examples, I just came up with names, but we probably should use the SSB step names.'
+        
+        sys.exit(0)
+       
+    def cmds4mkrefold(self,optionalargs):
 
         if self.verbose:
             print '##################################\n### Constructing commands'
@@ -408,6 +482,7 @@ class mkrefsclass(astrotableclass):
                         self.cmdtable.t.add_row({'reftype':reftype,'detector':detector,'outbasename':None,'cmdargs':cmdargs})
                     counter+=1
                 print '%d %s commands for detector %s' % (counter,reftype,detector)
+
         print '### in total, %d commands' % (len(self.cmdtable.t))
         if self.verbose>1:
             print 'Commands constructed:'
@@ -435,7 +510,7 @@ class mkrefsclass(astrotableclass):
         print "### overview: NOT YET IMPLEMENTED!!!"
         
 if __name__=='__main__':
-
+    
     mkrefs=mkrefsclass()
     parser = mkrefs.define_options()
     args = parser.parse_args()
@@ -458,7 +533,6 @@ if __name__=='__main__':
 
     mkrefs.cmds4mkref(optionalargs)
 
-    
     
     if args.batchmode:
         mkrefs.submitbatch()

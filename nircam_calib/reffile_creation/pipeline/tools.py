@@ -371,3 +371,5 @@ class astrotableclass:
         mjds = dateobjects.mjd
 
         self.t[mjdcol]=mjds
+
+
