@@ -209,7 +209,7 @@ class mkrefsclass(astrotableclass):
         returns list of Dark indeces, where the indices refer to the self.darks table
         '''
 
-        self.imtable.t['skip'][7]=True
+        #self.imtable.t['skip'][7]=True
         # indices for dark frames
         dindex, = np.where(self.imtable.t['imtype']=='dark')
         # indices for detector and not skipped
