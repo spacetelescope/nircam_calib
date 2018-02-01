@@ -50,9 +50,9 @@ class Gainimclass:
         self.autodark4readnoise = False
         self.gmax4dark = None
         self.xmin = 0
-        self.xmax = 2048
+        self.xmax = 2040
         self.ymin = 0
-        self.ymax = 2048
+        self.ymax = 2040
         self.Ngroupskeyword = 'NGROUPS'
         self.gmin = 0
         self.gmax = None
@@ -157,7 +157,7 @@ class Gainimclass:
         phdu = self.set_header_info(phdu)
         hdu_gain_err = fits.ImageHDU(gainim_err,name='gain_err')
         hdulist = fits.HDUList([phdu,hdu_gain,hdu_gain_err])
-        #print('Saving ',gainfilename)
+        print('Saving {}'.format(gainfilename))
         rmfile(gainfilename)
         hdulist.writeto(gainfilename)
 
@@ -279,12 +279,22 @@ class Gainimclass:
                 rdnoise = rdnoise_dsub12
             else:
                 #rdnoise = self.rdnoise['im'][int(y+0.5*yinfo[2]),int(x+0.5*xinfo[2])]
-                rdnoise = self.rdnoise['im'][int(y+0.5*self.boxsize),int(x+0.5*self.boxsize)]
+                #rdnoise = self.rdnoise['im'][int(y+0.5*self.boxsize),int(x+0.5*self.boxsize)]
+                rdnoise = self.rdnoise['im'][y,x]
             rdnoise2=rdnoise*rdnoise
 
             if self.verbose:
                 print('rdnoise=%.3f' % (rdnoise))
+                if rdnoise == 0:
+                    if self.rdnoise['im'] is None:
+                        print('rdnoise_dsub12',rdnoise_dsub12)
+                    else:
+                        print(y,self.boxsize,y+0.5*self.boxsize,x,self.boxsize,x+0.5*self.boxsize,self.rdnoise['im'][int(y+0.5*self.boxsize),int(x+0.5*self.boxsize)])
+                    print("WARNING: readnoise is zero here!!")
+                    print("There is a problem. Quitting.")
+                    sys.exit()
 
+                
             # get the correction for the default diffim stdev2
             keyssubik_g0 = tsubik.CUT_inrange('g',0,0,keys=keyssubik)
             if len(keyssubik_g0)!=1:
@@ -402,35 +412,35 @@ class Gainimclass:
            detector. A separate gain value will be 
            calculated within each box'''
 
-        numboxesx = np.int(510 / boxsize)
-        numboxesy = np.int(2040 / boxsize)
+        print("MAKING NEW IMPROVED BOX MAP!!")
+        
+        #numboxesx = np.int(510 / boxsize)
+        #numboxesy = np.int(2040 / boxsize)
+        numboxesx = np.int(512 / boxsize)
+        numboxesy = np.int(2048 / boxsize)
         boxesperquad = numboxesx*numboxesy
         xstart = np.arange(numboxesx+1) * boxsize
         ystart = np.arange(numboxesy+1) * boxsize
-        quadstart = np.array([0,510,1020,1530,2040])
-    
+        #quadstart = np.array([0,508,1020,1532,2044])
+        quadstart = np.array([0,512,1024,1536,2044])
+        
         # create a map of the detector, and label the pixels
         # that go with each box
-        map = np.zeros((2040,2040))
+        #map = np.zeros((2040,2040))
+        map = np.zeros((2048,2048))
         for q,quad in enumerate(quadstart[:-1]):
             for i,xs in enumerate(xstart[:-1]):
                 xend = xstart[i+1]
                 if i == (numboxesx-1):
-                    if quadstart[q+1] > xend:
+                    if quadstart[q+1] > xend:        # <? was > before!!!!
                         xend = quadstart[q+1]
 
                 for j,ys in enumerate(ystart[:-1]):
                     yend = ystart[j+1]
                     if j == (numboxesy-1):
-                        yend = 2040
+                        yend = 2044
                     map[ys:yend,quad+xs:quad+xend] = q*10000 + (j*numboxesx+i) 
 
-        #if os.path.isfile('pre_epoxymask_map.fits'):
-        #    os.remove('pre_epoxymask_map.fits')
-        #phdu=fits.PrimaryHDU(map)
-        #phdu.writeto('pre_epoxymask_map.fits')
-
-        
         # now we need to deal with the low-epoxy region, if any
         if detector in ['NRCA4','NRCALONG','NRCB1','NRCB4']:
             if self.verbose:
@@ -438,7 +448,7 @@ class Gainimclass:
             efile = lowepoxy[detector]
             ehdu = fits.open(efile)
             epoxymask = ehdu[1].data
-            epoxymask = epoxymask[4:2044,4:2044]
+            #epoxymask = epoxymask[4:2044,4:2044]
             ehdu.close()
             
             previousmax = np.max(map)
@@ -544,7 +554,8 @@ class Gainimclass:
                         xx = int(xcenter)
                         yy = int(ycenter)
                         surrounding = np.absolute(newmap - boxval)
-                        nx,ny = 2040,2040
+                        #nx,ny = 2040,2040
+                        nx,ny = 2048,2048
                         x, y = np.meshgrid(np.arange(nx)-xcenter, np.arange(ny)-ycenter)
                         surrounding_dist = np.sqrt(x**2 + y**2)
                         # Now find the closest pixel with a value that is not:
@@ -552,18 +563,19 @@ class Gainimclass:
                         #across the low-epoxy region boundary
                         otherboxes = (surrounding != 0) & (surrounding < 9000)
                     
-                        if os.path.isfile('surround.fits'):
-                            os.remove('surround.fits')
-                        if os.path.isfile('surround_dist.fits'):
-                            os.remove('surround_dist.fits')
-                        if os.path.isfile('otherboxes.fits'):
-                            os.remove('otherboxes.fits')
-                        thdu=fits.PrimaryHDU(surrounding)
-                        thdu.writeto('surround.fits')
-                        t2hdu=fits.PrimaryHDU(surrounding_dist)
-                        t2hdu.writeto('surround_dist.fits')
-                        t3hdu=fits.PrimaryHDU(otherboxes.astype(int))
-                        t3hdu.writeto('otherboxes.fits')                
+                        #if os.path.isfile('surround.fits'):
+                        #    os.remove('surround.fits')
+                        #if os.path.isfile('surround_dist.fits'):
+                        #    os.remove('surround_dist.fits')
+                        #if os.path.isfile('otherboxes.fits'):
+                        #    os.remove('otherboxes.fits')
+                        if self.test:
+                            thdu=fits.PrimaryHDU(surrounding)
+                            thdu.writeto('surround.fits',overwrite=True)
+                            t2hdu=fits.PrimaryHDU(surrounding_dist)
+                            t2hdu.writeto('surround_dist.fits',overwrite=True)
+                            t3hdu=fits.PrimaryHDU(otherboxes.astype(int))
+                            t3hdu.writeto('otherboxes.fits',overwrite=True)
 
                         if len(np.where(otherboxes == True)[0]) > 0:
                             minidist = np.min(surrounding_dist[otherboxes])
@@ -613,13 +625,22 @@ class Gainimclass:
         # Insert mask into 2048x2048 array, with the refpix set to NaN
         ffmap = np.zeros((2048,2048))
         ffmap[:,:] = np.nan
-        ffmap[4:2044,4:2044] = newmap
+        #ffmap[4:2044,4:2044] = newmap
+        ffmap[4:2044,4:2044] = newmap[4:2044,4:2044]
 
         box_centers = {}
         for bnum in self.nanunique(ffmap):
             box = ffmap == bnum
             ycent,xcent = ndimage.measurements.center_of_mass(box.astype(int))
-            box_centers[bnum] = (int(xcent),int(ycent))
+            xcent = int(xcent)
+            ycent = int(ycent)
+            if ffmap[ycent,xcent] == bnum:
+                box_centers[bnum] = (int(xcent),int(ycent))
+            else:
+                goodpix = np.where(ffmap == bnum)
+                dist = np.sqrt((xcent-goodpix[1])**2 + (ycent-goodpix[0])**2)
+                mindist = np.where(dist == np.min(dist))
+                box_centers[bnum] = (goodpix[0][mindist[0][0]],goodpix[1][mindist[0][0]])
 
         if np.nan in box_centers.keys():
             print('nan in box_centers!!')
@@ -1208,6 +1229,8 @@ class Gainimclass:
         skiprefpixcorr = self.skiprefpixcorr
         skipcorrect4framereset = self.skipcorrect4framereset
         darks4readnoiselist = self.darks
+        self.flatfile1 = infile1
+        self.flatfile2 = infile2
         
         # Get the proper darks
         if self.darks[0] is not None:
@@ -1277,6 +1300,12 @@ class Gainimclass:
         print("Generating box map")
         self.boxmap, self.box_centers = self.make_box_map(boxsize,detector)
 
+        #hhh = fits.PrimaryHDU()
+        #hh1 = fits.ImageHDU(self.boxmap)
+        #hhl = fits.HDUList([hhh,hh1])
+        #hhl.writeto('test_boxmap.fits',overwrite=True)
+
+        
         # make the mask files
         if self.verbose:
             print("Making bad pixel map")
