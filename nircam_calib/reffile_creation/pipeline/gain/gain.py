@@ -168,14 +168,14 @@ class Gainimclass:
         '''
         Populate necessary header information in the output file
         '''
-        hdu.header['FILETYPE'] = 'GAIN'
-        hdu.header['DETECTOR'] = self.hdr1['DETECTOR']
-        hdu.header['INSTRUME'] = 'NIRCAM'
-        hdu.header['TELESCOP'] = 'JWST'
-        hdu.header['FLATFIL1'] = self.flatfile1
-        hdu.header['FLATFIL2'] = self.flatfile2
-        hdu.header['DARKFIL1'] = self.darks[0]
-        hdu.header['DARKFIL2'] = self.darks[1]
+        hdu[0].header['FILETYPE'] = 'GAIN'
+        hdu[0].header['DETECTOR'] = self.hdr1['DETECTOR']
+        hdu[0].header['INSTRUME'] = 'NIRCAM'
+        hdu[0].header['TELESCOP'] = 'JWST'
+        hdu[0].header['FLATFIL1'] = self.flatfile1
+        hdu[0].header['FLATFIL2'] = self.flatfile2
+        hdu[0].header['DARKFIL1'] = self.darks[0]
+        hdu[0].header['DARKFIL2'] = self.darks[1]
         return hdu
 
                
