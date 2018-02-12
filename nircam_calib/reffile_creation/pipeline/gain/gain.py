@@ -32,6 +32,7 @@ lowepoxy['NRCA3'] = os.path.join(lowedir,'A3_CV3_low_epoxy_region_DMSorientation
 lowepoxy['NRCA4'] = os.path.join(lowedir,'A4_CV3_low_epoxy_region_DMSorientation.fits')
 lowepoxy['NRCALONG'] = os.path.join(lowedir,'ALONG_CV3_low_epoxy_region_DMSorientation.fits')
 lowepoxy['NRCB1'] = os.path.join(lowedir,'B1_CV3_low_epoxy_region_DMSorientation.fits')
+lowepoxy['NRCB3'] = os.path.join(lowedir,'B3_CV3_low_epoxy_region_DMSorientation.fits')
 lowepoxy['NRCB4'] = os.path.join(lowedir,'B4_CV3_low_epoxy_region_DMSorientation.fits')
 
 
@@ -168,14 +169,14 @@ class Gainimclass:
         '''
         Populate necessary header information in the output file
         '''
-        hdu[0].header['FILETYPE'] = 'GAIN'
-        hdu[0].header['DETECTOR'] = self.hdr1['DETECTOR']
-        hdu[0].header['INSTRUME'] = 'NIRCAM'
-        hdu[0].header['TELESCOP'] = 'JWST'
-        hdu[0].header['FLATFIL1'] = self.flatfile1
-        hdu[0].header['FLATFIL2'] = self.flatfile2
-        hdu[0].header['DARKFIL1'] = self.darks[0]
-        hdu[0].header['DARKFIL2'] = self.darks[1]
+        hdu.header['FILETYPE'] = 'GAIN'
+        hdu.header['DETECTOR'] = self.hdr1['DETECTOR']
+        hdu.header['INSTRUME'] = 'NIRCAM'
+        hdu.header['TELESCOP'] = 'JWST'
+        hdu.header['FLATFIL1'] = self.flatfile1
+        hdu.header['FLATFIL2'] = self.flatfile2
+        hdu.header['DARKFIL1'] = self.darks[0]
+        hdu.header['DARKFIL2'] = self.darks[1]
         return hdu
 
                
@@ -412,8 +413,6 @@ class Gainimclass:
            detector. A separate gain value will be 
            calculated within each box'''
 
-        print("MAKING NEW IMPROVED BOX MAP!!")
-        
         #numboxesx = np.int(510 / boxsize)
         #numboxesy = np.int(2040 / boxsize)
         numboxesx = np.int(512 / boxsize)
@@ -442,7 +441,7 @@ class Gainimclass:
                     map[ys:yend,quad+xs:quad+xend] = q*10000 + (j*numboxesx+i) 
 
         # now we need to deal with the low-epoxy region, if any
-        if detector in ['NRCA4','NRCALONG','NRCB1','NRCB4']:
+        if detector in ['NRCA1','NRCA3','NRCA4','NRCALONG','NRCB1','NRCB3','NRCB4']:
             if self.verbose:
                 print("Reading in low epoxy map")
             efile = lowepoxy[detector]
