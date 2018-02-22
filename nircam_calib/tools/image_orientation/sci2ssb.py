@@ -3,15 +3,6 @@
 # This script converts the fits files from the NIRCam CRYO runs
 # into ssb-conform fits files.
 
-# Before running it, make sure to set environment variables:
-#
-# export UAZCONVDIR='/grp/jwst/wit/nircam/nircam-tools/pythonmodules/'
-# export JWSTTOOLS_PYTHONMODULES='$JWSTTOOLS_ROOTDIR/pythonmodules'
-# export JWSTTOOLS_ROOTDIR='/grp/jwst/wit/nircam/nircam-tools'
-# export JWSTTOOLS_INSTRUMENT='NIRCAM'
-
-
-
 import sys, os,re,math
 import optparse,scipy
 from astropy.io import fits as pyfits
@@ -19,13 +10,25 @@ from jwst import datamodels as models
 from astropy.io import ascii
 import numpy as np
 from nircam2ssb import nircam2ssbclass
-sys.path.append(os.environ['UAZCONVDIR'])
 
 
 
-# Bryan's subarray list for the simulator
-subarrays = ascii.read("NIRCam_subarray_definitions.list")
+# Before running it, make sure to set environment variables:
+cmd1 = "export UAZCONVDIR='/grp/jwst/wit/nircam/nircam-tools/pythonmodules/'"
+cmd2 = "export JWSTTOOLS_PYTHONMODULES='$JWSTTOOLS_ROOTDIR/pythonmodules'"
+cmd3 = "export JWSTTOOLS_ROOTDIR='/grp/jwst/wit/nircam/nircam-tools'"
+cmd4 = "export JWSTTOOLS_INSTRUMENT='NIRCAM'"
 
+try:
+    sys.path.append(os.environ['UAZCONVDIR'])
+except KeyError:
+    for cmd in [cmd1,cmd2,cmd3,cmd4]:
+        os.system(cmd)
+
+
+# Subarray list from latest OSS summary
+# has format: AperName Detector ColCorner RowCorner Ncols Nrows
+subarrays = ascii.read("NIRCam_raw_coord_subarray_definitions.dat")
 
 
 class sci2ssbclass(nircam2ssbclass):
@@ -78,12 +81,8 @@ class sci2ssbclass(nircam2ssbclass):
         if self.runID in ['CV2','CV3', 'OTIS']:
             self.native_to_science_image_flip()
 
-        if self.runID in ['CV3']:
+        if self.runID in ['CV3','OTIS']:
             self.outputmodel.meta.exposure.readpatt = self.hdr['READOUT']
-
-        if self.runID in ['OTIS']:
-            self.outputmodel.meta.exposure.readpatt = self.hdr['READOUT']
-
 
 
         self.outputmodel.meta.exposure.nints = Nint
@@ -108,6 +107,13 @@ class sci2ssbclass(nircam2ssbclass):
         data = self.outputmodel.data
         print('trying to flip the image')
 
+        ncols = self.hdr['NAXIS1']
+        nrows = self.hdr['NAXIS2']
+        endcol = int(self.hdr['COLCORNR']) + int(ncols) - 1
+        endrow = int(self.hdr['ROWCORNR']) + int(nrows) - 1
+
+        print('detector is: ',self.hdr['DETECTOR'])
+
         # NIRCAM A2, A4, B1, B3, BLONG
         # Flip vertically
         if self.hdr['DETECTOR'] in ['NRCA2','NRCA4','NRCB1','NRCB3','NRCBLONG']:
@@ -115,100 +121,68 @@ class sci2ssbclass(nircam2ssbclass):
             self.outputmodel.data = flip
             self.outputmodel.meta.subarray.fastaxis = 1
             self.outputmodel.meta.subarray.slowaxis = -2
-            try:
-                detector_row_start = self.hdr['ROWCORNR']
-            except KeyError:
-                print('Unable to get subarray ROWCORNR, using 1')
-                detector_row_start = '0.000000'
-                try:
-                    detector_row_start = int(float(detector_row_start)) + 1
-                except ValueError:
-                    print('Unable to convert ROWCORNR to a valid integer, using 1')
-                    detector_row_start = 1
-            try:
-                detector_column_start = self.hdr['COLCORNR']
-            except KeyError:
-                print('Unable to get subarray COLCORNR, using 1')
-                detector_column_start = '0.00000'
-                try:
-                    detector_column_start = int(float(detector_column_start)) + 1
-                except ValueError:
-                    print('Unable to convert COLCORNR to a valid integer, using 1')
-                    detector_column_start = 1
+            if ncols == 2048 and nrows == 2048:
+                xstrt = 1
+                ystrt = 2048
+                xend = 1
+                yend = 2048
+            else:
+                xstrt = int(self.hdr['COLCORNR'])
+                ystrt = int(2048 - self.hdr['ROWCORNR'])
+                xend = int(endcol)
+                yend = int(2048 - endrow)
 
-            ncols = self.hdr['NAXIS1']
-            nrows = self.hdr['NAXIS2']
-            #
-            # Since we're flipping these data in the Y-direction only, COLCORNR and COLSTOP
-            # will be unchanged.
-            # ROWCORNR and ROWSTOP will swap and subtract from 2049
-            # FASTAXIS is 1, as the detector is still read from left to right
-            colstart = int(detector_column_start)
-            colstop = int(colstart + ncols - 1)
-            rowstop = int(2049 - detector_row_start)
-            rowstart = int(rowstop - nrows + 1)
-            fastaxis = 1
-            slowaxis = -2
 
         # NIRCAM A1, A3, ALONG, B2, B4
         # Flip horizontally
         elif self.hdr['DETECTOR'] in ['NRCA1','NRCA3','NRCB2','NRCB4','NRCALONG']:
+            print('original rowcorner,colcorner: ',self.hdr['ROWCORNR'],self.hdr['COLCORNR'])
             flip = data[:,:,:,::-1]
             self.outputmodel.data = flip
             self.outputmodel.meta.subarray.fastaxis = -1
             self.outputmodel.meta.subarray.slowaxis = 2
+            if ncols == 2048 and nrows == 2048:
+                xstrt = 1
+                ystrt = 2048
+                xend = 1
+                yend = 2048
+            else:
+                xstrt = int(2048 - self.hdr['COLCORNR'])
+                ystrt = int(self.hdr['ROWCORNR'])
+                xend = int(2048 - endcol)
+                yend = int(endrow)
 
-            try:
-                detector_row_start = self.hdr['ROWCORNR']
-            except KeyError:
-                print('Unable to get subarray ROWCORNR, using 1')
-                detector_row_start = '0.000000'
-                try:
-                    detector_row_start = int(float(detector_row_start)) + 1
-                except ValueError:
-                    print('Unable to translate ROWCORNR to a valid integer, using 1')
-                    detector_row_start = 1
-            try:
-                detector_column_start = self.hdr['COLCORNR']
-            except KeyError:
-                print('Unable to get subarray COLCORNR, using 1')
-                detector_column_start = '0.00000'
-                try:
-                    detector_column_start = int(float(detector_column_start)) + 1
-                except ValueError:
-                    print('Unable to translate COLCORNR to a valid integer, using 1')
-                    detector_column_start = 1
-
-            ncols = self.hdr['NAXIS1']
-            nrows = self.hdr['NAXIS2']
-            #
-            # Since we're flipping these data in the X-direction only, ROWCORNR and ROWSTOP
-            # will be unchanged.
-            # COLCORNR and COLSTOP will swap and subtract from 2049
-            # FASTAXIS is -1, as the detector is now read from right to left
-            rowstart = int(detector_row_start)
-            rowstop = int(rowstart + nrows - 1)
-            colstop = int(2049 - detector_column_start)
-            colstart = int(colstop - ncols + 1)
-            fastaxis = -1
-            slowaxis = 2
         else:
             print("WARNING! I don't recognize {} as a valid detector!".format(self.detector))
             sys.exit(0)
 
-        self.outputmodel.meta.subarray.xstart = rowstart
-        self.outputmodel.meta.subarray.xsize = ncols
-        self.outputmodel.meta.subarray.ystart = colstart
-        self.outputmodel.meta.subarray.ysize = nrows
-        self.outputmodel.meta.subarray.fastaxis = fastaxis
-        self.outputmodel.meta.subarray.slowaxis = slowaxis
+        if xstrt > xend:
+            subxstrt = xend
+            subxend = xstrt
 
-        print('trying to get the subarray name')
+        elif xstrt < xend:
+            subxstrt = xstrt
+            subxend = xend
+
+        if ystrt > yend:
+            subystrt = yend
+            subyend = ystrt
+
+        elif ystrt < yend:
+            subystrt = ystrt
+            subyend = yend
+
+        print('final rowcorner,colcorner',subxstrt,subystrt)
+        self.outputmodel.meta.subarray.xstart = subxstrt
+        self.outputmodel.meta.subarray.xsize = ncols
+        self.outputmodel.meta.subarray.ystart = subystrt
+        self.outputmodel.meta.subarray.ysize = nrows
+
 
         #  Update the subarray parameters
-        subarray_name = self.get_subarray_name(subarrays, colstart-1, colstop-1, rowstart-1, rowstop-1)
+        print('trying to get the subarray name')        
+        subarray_name = self.get_subarray_name(subarrays,self.hdr['DETECTOR'],self.hdr['COLCORNR'], self.hdr['ROWCORNR'])
         self.outputmodel.meta.subarray.name = subarray_name
-        print('subarray name is: '+subarray_name)
 
 
 if __name__=='__main__':
