@@ -346,13 +346,30 @@ class nircam2ssbclass:
         else:
             print('ERROR: runID=%s not yet implemented into "updatemetadata"' % runID)
             sys.exit(0)
+            
 
-    def get_subarray_name(self,subarrays,colstart, colstop, rowstart, rowstop):
-        for i in np.arange(0,len(subarrays)):
-            subarray_row = subarrays[i]
-            if rowstart == subarray_row['xstart'] and rowstop == subarray_row['xend'] and colstart == subarray_row['ystart'] and colstop == subarray_row['yend']:
-                return subarray_row['Name']
-        return 'UNKNOWN'
+    def get_subarray_name(self,subarrays,detector,colcorner,rowcorner):
+        if 'LONG' in detector:
+            detector = detector[3:4]+'5'
+        else:
+            detector = detector[3:]
+
+        detector_subs = subarrays[subarrays['Detector'] == detector]
+        fullname = ""
+
+        for i in np.arange(0,len(detector_subs)):
+            if detector_subs[i]['RowCorner'] == rowcorner and detector_subs[i]['ColCorner'] == colcorner:
+                fullname = detector_subs[i]['AperName']
+                print('full name:',fullname)
+                break
+
+        if not fullname:
+            subname = 'UNKNOWN'
+            print('Error, unable to find matching subarray!')
+        else:
+            subname = fullname[fullname.find('_')+1:]
+        print('subarray name: ',subname)
+
 
     def image2ssb(self,inputfilename, outfilebasename='auto',outdir=None,outsuffix=None,outsubdir=None):
         outfilebasename = self.mkoutfilebasename(inputfilename, outfilebasename=outfilebasename,outdir=outdir,outsuffix=outsuffix,outsubdir=outsubdir)
