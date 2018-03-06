@@ -12,25 +12,25 @@ Readout:
   pupil: CLEAR          #Pupil element for simulated data (CLEAR, GRISMC, etc)
 
 Reffiles:                                 #Set to None or leave blank if you wish to skip that step
-  dark: /ifs/jwst/wit/witserv/data4/nrc/hilbert/superbias/cv3/ALONG/NRCNRCALONG-DARK-60091140151_1_485_SE_2016-01-09T14h23m49_uncal.fits   #Dark current integration used as the base
+  dark: NRCNRCALONG-DARK-60091140151_1_485_SE_2016-01-09T14h23m49_uncal.fits   #Dark current integration used as the base
   linearized_darkfile: None #linearized dark current file
-  badpixmask: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/badpix/NRCA5_17158_BPM_ISIMCV3_2016-01-21_ssbspmask_DMSorient.fits
-  superbias: /ifs/jwst/wit/witserv/data4/nrc/hilbert/superbias/cv3/ALONG/A5_superbias_from_list_of_biasfiles.list.fits     #Superbias file. Set to None or leave blank if not using
+  badpixmask: NRCA5_17158_BPM_ISIMCV3_2016-01-21_ssbspmask_DMSorient.fits
+  superbias: A5_superbias_from_list_of_biasfiles.list.fits     #Superbias file. Set to None or leave blank if not using
   subarray_defs: config #File that contains a list of all possible subarray names and coordinates
   readpattdefs: config #File that contains a list of all possible readout pattern names and associated NFRAME/NSKIP values
-  linearity: /ifs/jwst/wit/witserv/data7/nrc/reference_files/SSB/CV3/cv3_reffile_conversion/linearity/NRCALONG_17158_LinearityCoeff_ADU0_2016-05-16_ssblinearity_v2_DMSorient.fits     #linearity correction coefficients
-  saturation: /ifs/jwst/wit/witserv/data7/nrc/reference_files/SSB/CV3/cv3_reffile_conversion/welldepth/NRCA5_17158_WellDepthADU_2016-03-10_ssbsaturation_wfact_DMSorient.fits    #well depth reference files
-  gain: /ifs/jwst/wit/witserv/data7/nrc/reference_files/SSB/CV3/cv3_reffile_conversion/gain/NRCA5_17158_Gain_ISIMCV3_2016-01-23_ssbgain_DMSorient.fits      #Gain map
+  linearity: NRCALONG_17158_LinearityCoeff_ADU0_2016-05-16_ssblinearity_v2_DMSorient.fits     #linearity correction coefficients
+  saturation: NRCA5_17158_WellDepthADU_2016-03-10_ssbsaturation_wfact_DMSorient.fits    #well depth reference files
+  gain: NRCA5_17158_Gain_ISIMCV3_2016-01-23_ssbgain_DMSorient.fits      #Gain map
   pixelflat: None 
   illumflat: None                               #Illumination flat field file
-  astrometric: /ifs/jwst/wit/witserv/data4/nrc/hilbert/distortion_reference_file/jwreftools/nircam/NRCA5_FULL_distortion.asdf          #Astrometric distortion file (asdf)
-  distortion_coeffs: /ifs/jwst/wit/witserv/data4/nrc/hilbert/simulated_data/NIRCam_SIAF_2017-03-28.csv           #CSV file containing distortion coefficients
-  ipc: /ifs/jwst/wit/witserv/data7/nrc/reference_files/SSB/CV3/cv3_reffile_conversion/ipc/NRCA5_17158_IPCDeconvolutionKernel_2016-03-18_ssbipc_DMSorient.fits          #File containing IPC kernel to apply
+  astrometric: NRCA5_FULL_distortion.asdf          #Astrometric distortion file (asdf)
+  distortion_coeffs: NIRCam_SIAF_2017-03-28.csv           #CSV file containing distortion coefficient
+  ipc: NRCA5_17158_IPCDeconvolutionKernel_2016-03-18_ssbipc_DMSorient.fits          #File containing IPC kernel to apply
   invertIPC: True       #Invert the IPC kernel before the convolution. True or False. Use True if the kernel is designed for the removal of IPC effects, like the JWST reference files are.
-  crosstalk: /ifs/jwst/wit/witserv/data4/nrc/hilbert/simulated_data/xtalk20150303g0.errorcut.txt              #File containing crosstalk coefficients
+  crosstalk: xtalk20150303g0.errorcut.txt              #File containing crosstalk coefficients
   occult: None                                    #Occulting spots correction image
   filtpupilcombo: config #File that lists the filter wheel element / pupil wheel element combinations. Used only in writing output file
-  pixelAreaMap: /ifs/jwst/wit/nircam/nircam_simulator_data/reference_files/pam/NIRCam_A5_PAM_imaging.fits  #Pixel area map for the detector. Used to introduce distortion into the output ramp.
+  pixelAreaMap: NIRCam_A5_PAM_imaging.fits  #Pixel area map for the detector. Used to introduce distortion into the output ramp.
   flux_cal: config #File that lists flux conversion factor and pivot wavelength for each filter. Only used when making direct image outputs to be fed into the grism disperser code.
   filter_throughput: config #File containing filter throughput curve
   
@@ -42,7 +42,7 @@ nonlin:
 
 
 cosmicRay:
-  path: /ifs/jwst/wit/nircam/nircam_simulator_data/cosmic_ray_library/ #Path to CR library
+  path: /my_cosmic_ray_library_path/ #Path to CR library
   library: SUNMIN                   #Type of cosmic ray environment (SUNMAX, SUNMIN, FLARE)
   scale: 1.0                                 #Cosmic ray scaling factor
   suffix: IPC_NIRCam_A5             #Suffix of library file names
@@ -50,7 +50,7 @@ cosmicRay:
 
 simSignals:
   pointsource: A5_TA_timeseries_ptsrc_mag04.0_center_15.5_15.5.cat  #File containing a list of point sources to add (x,y locations and magnitudes)
-  psfpath: /ifs/jwst/wit/nircam/nircam_simulator_data/webbpsf_library/ #Path to PSF library
+  psfpath: /my_webbpsf_library/ #Path to PSF library
   psfbasename: nircam                        #Basename of the files in the psf library
   psfpixfrac: 0.25                           #Fraction of a pixel between entries in PSF library (e.g. 0.1 = files for PSF centered at 0.1 pixel intervals within pixel)
   psfwfe: predicted                              #PSF WFE value (0,115,123,132,136,150,155)
