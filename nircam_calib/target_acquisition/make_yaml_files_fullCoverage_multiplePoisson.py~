@@ -1,0 +1,67 @@
+#! /usr/bin/env python
+
+'''
+Create the collection of input yaml files for the TA with 
+saturated pixels study
+'''
+import os
+from copy import copy
+import numpy as np
+import yaml
+
+basedir = '/ifs/jwst/wit/witserv/data7/nrc/hilbert/target_acq/file_deliveries/additional_data/saturated_pixels/reorganized_full_coverage'
+
+samplefile = 'example_yaml_file.yaml'
+
+xpos = [15.0,15.25,15.5,15.75,16.0]
+ypos = [15.0,15.25,15.5,15.75,16.0]
+maglist = np.arange(57,101,1)/10   # basic mag coverage
+noise_realizations = 4 # number of poisson noise realizations
+                       # for each location/magnitude combination
+
+#still need to determine this range below...
+#maglist2 = np.arange(65,80,1)/10 # higher res. near area of interest
+
+#maglist = np.append(maglist,maglist2)
+maglist = sorted(np.unique(maglist))
+
+with open(samplefile,'r') as infile:
+    lines = yaml.load(infile)
+
+cprefix = 'A5_TA_timeseries_ptsrc_mag'
+oprefix = 'nrca5_TA_timeseries_NRCFLATA5GRTS_mag'
+yprefix = 'ta_sim_timeseries_A5_nrcflata5grts_mag'
+
+poisson_seeds = np.random.randint(1,1000000,size=(len(xpos),len(ypos),len(maglist),noise_realizations))
+
+for ix,xp in enumerate(xpos):
+    for iy,yp in enumerate(ypos):
+        for imag,mag in enumerate(maglist):
+            for realization in range(noise_realizations):
+                magstr = str(np.around(mag,decimals=1))
+                xstr = str(np.around(xp,decimals=2))
+                ystr = str(np.around(yp,decimals=2))
+                outlines = copy(lines)
+
+                if mag < 10:
+                    magpre = '0'
+                else:
+                    magpre = ''
+                midtext = magpre + magstr + '_center_'+ xstr +'_'\
+                          + ystr + '_noiserealiz_' + str(realization)
+                catmidtext = magpre + magstr + '_center_'+ xstr +'_'\
+                              + ystr
+                cfile = cprefix + catmidtext + '.cat'
+                ofile = oprefix + midtext + '_uncal.fits'
+                yfile = yprefix + midtext + '.yaml'
+                magint = str(np.int(mag))
+                yfile = os.path.join('mag'+magint,yfile)
+                cfile = os.path.join('mag'+magint,cfile)
+                outlines['simSignals']['pointsource'] = cfile
+                outlines['Output']['file'] = ofile
+                outlines['simSignals']['poissonseed'] = int(poisson_seeds[ix,iy,imag,realization])
+                outlines['Output']['directory'] = os.path.join(basedir,'mag'+magint)
+                with open(yfile,'w') as output:
+                    yaml.dump(outlines,output,default_flow_style=False)
+                print(yfile)
+            
