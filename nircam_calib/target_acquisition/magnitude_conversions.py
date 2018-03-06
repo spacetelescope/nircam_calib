@@ -1,0 +1,63 @@
+#! /usr/bin/env python
+
+'''
+convert between vegamag and abmag since the ETC brightness limits
+for TA sources are given in Vegamags, but the simulator
+only knows abmags and stmags
+'''
+import os
+from astropy import units as u
+import numpy as np
+import synphot as S
+from synphot import SourceSpectrum, Observation, SpectralElement, units
+from synphot.units import convert_flux
+import stsynphot as STS
+
+#(1) Find a spectrum that is equivalent to G2V.
+#(2) Renormalize it to said VEGAMAG in K-band. For this, you need to know the version of Vega and also the SpectralElement for K.
+#(3) Create `Observation` of that renormalized spectrum using F335M as bandpass.
+#(4) Calculate `effstim` of the `Observation` in ABMAG.
+
+
+class MagConvert():
+    def __init__(self):
+        self.verbose = False
+        self.telescope_area = 25.326 * 10000. #JWST primary area in cm^2
+        self.wave_bins = np.arange(0.5, 5, 0.1) * u.micron
+        self.vega = SourceSpectrum.from_vega()
+        self.g2v = STS.grid_to_spec('ck04models', 5860, 0., 4.40)
+        self.kband = SpectralElement.from_filter('bessel_k')
+
+        self.bpdir = './'
+        self.bpfile = os.path.join(self.bpdir,'F335M_nircam_plus_ote_throughput_moda_sorted.txt')
+        self.bp = SpectralElement.from_file(self.bpfile,wave_unit=u.micron)
+        
+        
+    def kvega_to_f335abmag(self,kmag):
+        '''Convert K band vegamag to F335M ABmag'''
+
+        kmag = kmag * units.VEGAMAG
+        new_g2v = self.g2v.normalize(kmag,band=self.kband,
+                                area=self.telescope_area,
+                                vegaspec=self.vega)
+        obs = Observation(new_g2v,self.bp,binset=self.wave_bins)
+        abmag = obs.effstim('ABmag',area=self.telescope_area)
+        return abmag
+        
+
+    def f335abmag_to_kvega(self,abmag):
+        '''Convert F335M ABmag to K band vegamag'''
+
+        abmag = abmag * u.ABmag
+        new_g2v = self.g2v.normalize(abmag,band=self.bp,
+                                     area=self.telescope_area,
+                                     vegaspec=self.vega)
+        obs = Observation(new_g2v,self.kband,binset=self.wave_bins)
+        kmag = obs.effstim('Vegamag',area=self.telescope_area,
+                           vegaspec=self.vega)
+        return kmag
+
+
+
+
+
