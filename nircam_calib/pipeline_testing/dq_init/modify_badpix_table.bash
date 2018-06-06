@@ -1,0 +1,1 @@
+python modify_badpix_table.py ../reffiles/NRCA1_17004_BPM_ISIMCV3_2016-01-21_ssbspmask_DMSorient.fits --outfile NRCA1_17004_BPM_ISIMCV3_2016-01-21_ssbspmask_DMSorient_modified.fits

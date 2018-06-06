@@ -1,0 +1,1 @@
+python test_dq_init.py ../exposures/nrca1_47Tuc_subpix_dither1_newpos_uncal.fits NRCA1_17004_BPM_ISIMCV3_2016-01-21_ssbspmask_DMSorient_modified.fits --outfile nrca1_47Tuc_subpix_dither1_newpos_dq_init.fits
