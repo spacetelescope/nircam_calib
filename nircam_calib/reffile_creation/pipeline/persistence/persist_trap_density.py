@@ -4,7 +4,7 @@
 Create persistence trap density reference file
 '''
 
-from jwst.datamodels import TrapDenisityModel
+from jwst.datamodels import TrapDensityModel
 from astropy.io import fits
 
 class TrapDen():
@@ -26,7 +26,7 @@ class TrapDen():
     def save(self):
         # If the input is a file, read in
         if self.input_file:
-            with fits.open(self.input) as h:
+            with fits.open(self.input_file) as h:
                 traps = h[1].data
         else:
             traps = self.input
@@ -49,5 +49,5 @@ class TrapDen():
         mod.meta.ysize = 2048
         mod.meta.xstart = 1
         mod.meta.ystart = 1
-        mod.history.append()
+        mod.history.append() 
         mod.save(os.path.join(self.outdir,self.outfile))
