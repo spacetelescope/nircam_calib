@@ -38,5 +38,5 @@ If you find any problems with the scripts in these folders, do the following:
 3. Fill out the title and description of the issue (don't assign anyone or tag it with a label if you aren't sure)
 4. Click "Submit New Issue"
 
-Collaborators on the repository will be notified of the new issue ticket and can respond or provide comments inside the ticket.  
+Collaborators on the repository will be notified of the new issue ticket and can respond or provide comments inside the ticket. Submitting issues through GitHub helps track any problems and work being done on the repository. 
 
