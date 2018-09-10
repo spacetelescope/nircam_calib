@@ -19,7 +19,7 @@ There are several kinds of tests that will be structured differently described i
 
 If you would like to see the unit and regression tests that are already included in the pipeline, visit the pipeline GitHub repository: https://github.com/spacetelescope/jwst/tree/master/jwst. Unit tests are in the `tests` directories within the individual pipeline step subdirectories. Regression tests are in the `tests` directory listed in the `jwst` directory. 
 
-
+---
 
 ## Using Python's `pytest` framework 
 
