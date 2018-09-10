@@ -26,11 +26,11 @@ Below are some notes to help you get started with using `pytest`. To see an exam
 - pytest-html
 
 
-### Notes about tests
+#### Notes about tests
 
-- unit test functions should not require or depend on input files (including reference files)
-- all test function names must have a `test_` prefix (functions without the prefix won't be run as `pytests`, though other functions can use them)
-- test names should be very descriptive for easy identification in the report
+  - unit test functions should not require or depend on input files (including reference files)
+  - all test function names must have a `test_` prefix (functions without the prefix won't be run as `pytests`, though other functions can use them)
+  - test names should be very descriptive for easy identification in the report
 
 
 ### To run `pytest`
