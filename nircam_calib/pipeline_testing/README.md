@@ -55,6 +55,6 @@ This command depends on your specific directory structure, but this provides the
 
 
 ### Parallelization
-The `xdist` plug-in allows you to parallelize your tests. Do this by specifying the number of machine cores you want to use.
+The `xdist` plug-in allows you to parallelize your tests. Do this by specifying the number of machine cores you want to use in place of `<cores>` below:
 
 `$ pytest -n <cores>`
