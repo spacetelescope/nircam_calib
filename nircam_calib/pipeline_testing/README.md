@@ -3,12 +3,12 @@
 This repository contains code used to test the JWST calibration pipeline. Any contributed code should follow the `pytest` format. To read more about automating testing with `pytest`, visit the documentation pages: https://docs.pytest.org/en/documentation-restructure/how-to/index.html
 
 There are several kinds of tests that will be structured differently: 
-- **unit**: simple tests that don't require input files to check that the Pipeline functions do what they are expected to do.
-- **regression**: tests to see if the Pipeline step produces the expected outcome by comparing an input file with a truth file.
-- **integration**: end-to-end testing to check that all of the Pipelines run as expected.
-- **verification**: functional testing to make sure that the Pipeline runs for all types of JWST data for all possible modes without crashing (can be wrapped up into unit testing).
-- **validation part 1**: checks that the Pipeline meets requirements defined at the start of the mission planning (i.e., checks the underlying algorithms).
-- **validation part 2**: determines the accuracy and quality that the Pipeline can achieve (to what extent the selected algorithms meet the error budget and how these vary for different types of data/science cases). 
+- **unit**: simple tests that don't require input files to check that the pipeline functions do what they are expected to do.
+- **regression**: tests to see if the pipeline step produces the expected outcome by comparing an input file with a truth file.
+- **integration**: end-to-end testing to check that all of the pipelines run as expected.
+- **verification**: functional testing to make sure that the pipeline runs for all types of data for all possible modes without crashing (can be wrapped up into unit testing).
+- **validation part 1**: checks that the pipeline meets requirements defined at the start of the mission planning (i.e., checks the underlying algorithms).
+- **validation part 2**: determines the accuracy and quality that the pipeline can achieve (to what extent the selected algorithms meet the error budget and how these vary for different types of data/science cases). 
 
 If you would like to see the unit and regression tests that are already included in the pipeline, visit the pipeline GitHub repository: https://github.com/spacetelescope/jwst/tree/master/jwst. Unit tests are in the `tests` directories within the individual pipeline step subdirectories. Regression tests are in the `tests` directory listed in the `jwst` directory. 
 
@@ -27,10 +27,12 @@ Below are some notes to help you get started with using `pytest`. To see an exam
 
 ### Pytest dependencies for reporting and parallelization
 
+To generate reports or take advantage of parallelization, you need to install the following plug-ins: 
 - pytest-cov
 - pytest-xdist
 - pytest-html
 
+Install them using conda or pip, e.g.: `conda install pytest-cov` or `pip install pytest-cov`. 
 
 ### To run `pytest`
 
