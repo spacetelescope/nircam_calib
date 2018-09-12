@@ -81,11 +81,11 @@ import pwd
 import stat
 
 # owner and group names to use
-DEFAULT_GROUP = 'something'
+DEFAULT_GROUP = 'STSCI/science'
 
 # set the default mode for DEFAULT_OWNER
-#DEFAULT_MODE = stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP # equivalent to '?rwxr-x---'
-DEFAULT_MODE = stat.S_IREAD | stat.S_IWRITE | stat.S_IRGRP | stat.S_IWGRP # '?rw-rw----'
+DEFAULT_MODE = stat.S_IREAD | stat.S_IWRITE | stat.S_IRGRP | stat.S_IWGRP  # '?rw-rw----'
+
 
 def get_group_string(pathname):
     """Return the group of ``pathname`` in string representation.

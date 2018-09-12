@@ -71,6 +71,7 @@ from jwql.utils.utils import get_config
 
 LOG_FILE_LOC = ''
 
+
 def configure_logging(module, path='./'):
     """Configure the log file with a standard logging format.
 
@@ -172,8 +173,10 @@ def log_info(func):
         minutes_cpu, seconds_cpu = divmod(remainder_cpu, 60)
         hours_time, remainder_time = divmod(t2_time - t1_time, 60 * 60)
         minutes_time, seconds_time = divmod(remainder_time, 60)
-        logging.info('Elapsed Real Time: {0:.0f}:{1:.0f}:{2:f}'.format(hours_time, minutes_time, seconds_time))
-        logging.info('Elapsed CPU Time: {0:.0f}:{1:.0f}:{2:f}'.format(hours_cpu, minutes_cpu, seconds_cpu))
+        logging.info('Elapsed Real Time: {0:.0f}:{1:.0f}:{2:f}'.format(hours_time, minutes_time,
+                                                                       seconds_time))
+        logging.info('Elapsed CPU Time: {0:.0f}:{1:.0f}:{2:f}'.format(hours_cpu, minutes_cpu,
+                                                                      seconds_cpu))
 
     return wrapped
 
