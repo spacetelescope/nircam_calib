@@ -47,7 +47,7 @@ class refpix_g0:
         zero_read = copy.deepcopy(ramp.data[:,0,:,:])
 
         #subtract the zeroth read from all subsequent reads
-        for integration in xrange(nint):
+        for integration in range(nint):
             data[integration,:,:,:] -= zero_read[integration,:,:]
         ramp.data = data
 
@@ -56,7 +56,7 @@ class refpix_g0:
 
         #now add the original 0th read back in
         data = ramp.data
-        for integration in xrange(nint):
+        for integration in range(nint):
             data[integration,:,:,:] += zero_read[integration,:,:]
             #dd = data[0,0,:,:] - zero_read[0,:,:]
         ramp.data = data
