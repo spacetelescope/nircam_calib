@@ -11,7 +11,7 @@ from jwst.dq_init import DQInitStep
 from jwst.saturation import SaturationStep
 import glob,argparse,os,sys
 from astropy.io import fits
-from refpixcorr_g0 import refpix_g0
+from .refpixcorr_g0 import refpix_g0
 
 
 #bpmfiles = {'A1':'','A2':'','A3':'','A4':'','ALONG':'','B1':'','B2':'','B3':'','B4':'','BLONG':''}

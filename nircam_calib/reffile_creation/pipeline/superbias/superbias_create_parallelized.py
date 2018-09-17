@@ -47,7 +47,7 @@ def calculate_means(data,boxwidth,edge_truncate=True):
     targets = np.arange(0,data.shape[1],boxwidth/2)
     means = np.zeros((data.shape[0],len(targets)))
     uncs = np.zeros_like(means)
-    for group in xrange(data.shape[0]):
+    for group in range(data.shape[0]):
         for i,center in enumerate(targets):
             if center < boxwidth/2:
                 pix = data[group,0:boxwidth/2+1]
@@ -88,7 +88,7 @@ def calculate_means(data,boxwidth,edge_truncate=True):
         
 
 def correct_1overf(data,filename,boxwidth,appwidth):
-    import nn2
+    from . import nn2
     from numpy import zeros,zeros_like,sqrt
 
     print('Beginning 1/f correction, using NN2 method.')
@@ -120,7 +120,7 @@ def correct_1overf(data,filename,boxwidth,appwidth):
     meancheck = np.zeros((2040,44))
 
     #We don't want to mix pixels from different amplifiers, so work on each quad separately
-    for amp in xrange(4):
+    for amp in range(4):
     #print("-----------------------------------------------")
     #print("-----------------------------------------------")
     #print("-----------------------------------------------")
@@ -138,10 +138,10 @@ def correct_1overf(data,filename,boxwidth,appwidth):
 
         #Work one row at a time to save memory
         zd,yd,xd = qdata.shape
-        for rownum in xrange(yd):
+        for rownum in range(yd):
         #for rownum in xrange(100,300):
             if rownum % 100 == 0:
-                print("Amp: %s, Row: %s"%(amp+1,rownum))
+                print(("Amp: %s, Row: %s"%(amp+1,rownum)))
                 #if self.verbose == True:
                 #    self.verb.write("Amp: {}, Row: {}\n".format(amp+1,rownum))
             rowdata = qdata[:,rownum,:]
@@ -152,8 +152,8 @@ def correct_1overf(data,filename,boxwidth,appwidth):
             #calculate the matrix of differences
             diffrowdata = np.zeros((zd*(zd-1)/2,xd))
             outidx = 0
-            for idx in xrange(zd):
-                for idx2 in xrange(idx+1,zd):
+            for idx in range(zd):
+                for idx2 in range(idx+1,zd):
                     #print('diffrowdata[{},:] = rowdata[{},:] - rowdata[{},:]'.format(outidx,idx,idx2))
                     diffrowdata[outidx,:] = rowdata[idx,:] - rowdata[idx2,:]
                     outidx = outidx + 1
@@ -180,7 +180,7 @@ def correct_1overf(data,filename,boxwidth,appwidth):
             #Now we need to work on each meanbox of the row. For each box, construct
             #the NxN matrix of all possible difference values. This matrix is then fed
             #into the NN2 machinery.
-            for box in xrange(means.shape[1]):
+            for box in range(means.shape[1]):
 
                 #allmeans = means[:,box]
                 #alluncs = uncs[:,box]
@@ -195,8 +195,8 @@ def correct_1overf(data,filename,boxwidth,appwidth):
                 allmeans = zeros((zd,zd))
                 alluncs = zeros_like(allmeans)
                 idx = 0
-                for y in xrange(0,zd):
-                    for x in xrange(y+1,zd):
+                for y in range(0,zd):
+                    for x in range(y+1,zd):
                         allmeans[y,x] = means[idx,box]
                         allmeans[x,y] = 0. - means[idx,box]
                         alluncs[y,x] = uncs[idx,box]
@@ -230,7 +230,7 @@ def correct_1overf(data,filename,boxwidth,appwidth):
 
                 #save the NN2 output vector and uncertainty vector for each pixel. We also
                 #need the mean vector, for later subtraction
-                for xpt in xrange(qstart[amp]+targx[box]-(appwidth/2),qstart[amp]+targx[box]+(appwidth/2)):
+                for xpt in range(qstart[amp]+targx[box]-(appwidth/2),qstart[amp]+targx[box]+(appwidth/2)):
                     #print('qstart[amp] ',qstart[amp],'targx[box] ',targx[box],'appwidth/2 ',appwidth/2,'appwidth/2 ',appwidth/2)
                     if xpt >= (qstart[amp]) and xpt < (qstart[amp+1]):
                         #print('box ',box,'xpt ',xpt)
@@ -254,7 +254,7 @@ def correct_1overf(data,filename,boxwidth,appwidth):
         #print('Number of nan pixels in amp: ',len(np.where(nancheck == True)[0]))
         #print("1/f correction: Amp {} done".format(amp+1))
 
-    print("Pixel tracking, nn2 corrected data. Pixel ({},{}) = {}".format(checkx,checky,nn2corrdata[0,checkx-4,checky-4]))
+    print(("Pixel tracking, nn2 corrected data. Pixel ({},{}) = {}".format(checkx,checky,nn2corrdata[0,checkx-4,checky-4])))
     #print('NN2 correction image:')
     #print(nn2corrdata[0,518,472],nn2corrdata[0,518,545])
     #print('NN2 mean:')
@@ -341,7 +341,7 @@ def bias_from_file(filename,boxwidth,appwidth,groupstart,groupend,integration,sk
     #just grab the first integration for the moment
     if len(data.shape) == 4:
         if data.shape[0] > 1:
-            print("Extracting integration {} from the input file.".format(integration))
+            print(("Extracting integration {} from the input file.".format(integration)))
             #print("Data is a 4D array. Grabbing the first integration and ignoring the rest.")
             #if self.verbose == True:
             #    self.verb.write("Extracting integration {} from the input file.\n".format(self.integration))
@@ -356,7 +356,7 @@ def bias_from_file(filename,boxwidth,appwidth,groupstart,groupend,integration,sk
     if ((groupstart >= 0) & (groupstart < numgroups)):
         if ((groupend > groupstart) & (groupend < numgroups)):
             print("========================")
-            print("Using groups {} through {} to construct the superbias.".format(groupstart,groupend))
+            print(("Using groups {} through {} to construct the superbias.".format(groupstart,groupend)))
             print("========================")
             #if self.verbose == True:
             #    print("========================\n")
@@ -591,7 +591,7 @@ def ipc_correction_image(orig,detector,save=False):
     #subtract 1.0 from the central element of the kernel
     kernel[1,1] = kernel[1,1] - 1.
     #kernel[1,1] = 1. - (kernel[1,1]-1.)
-    print("IPC kernel being used is: {}".format(kernel))
+    print(("IPC kernel being used is: {}".format(kernel)))
 
     #test = orig[18,300:700,:]
     #hot = np.where(test == np.max(test))
@@ -605,41 +605,41 @@ def ipc_correction_image(orig,detector,save=False):
 
     corr_image = np.zeros_like(orig)
     
-    for amp in xrange(4):
+    for amp in range(4):
         subframe = orig[:,:,qstart[amp]:qstart[amp+1]]
 
         nansubframe = np.isnan(subframe)
         if len(np.where(nansubframe == True)[0]) > 0:
             print("nan subframe!!")
-            print(len(np.where(nansubframe == True)[0]))
+            print((len(np.where(nansubframe == True)[0])))
             
 
         app_kernel = kernel
         if ((amp == 1) | (amp == 3)):
             app_kernel = np.fliplr(kernel)
 
-        for group in xrange(orig.shape[0]):
+        for group in range(orig.shape[0]):
             summed_image = np.zeros((subframe.shape[1],subframe.shape[2]))
 
-            for j in xrange(kernel.shape[0]):
-                for i in xrange(kernel.shape[1]):
+            for j in range(kernel.shape[0]):
+                for i in range(kernel.shape[1]):
                     prod = subframe[group,:,:] * kernel[j,i]
 
                     nanlen = nancheck(prod)
                     if nanlen > 0:
-                        print("NAN 1st Prod {},{},{},{}".format(amp,group,j,i))
+                        print(("NAN 1st Prod {},{},{},{}".format(amp,group,j,i)))
 
                     prod = np.roll(prod,shift_dict[str(j)],axis=0)
 
                     nanlen = nancheck(prod)
                     if nanlen > 0:
-                        print("NAN 2nd Prod {},{},{},{}".format(amp,group,j,i))
+                        print(("NAN 2nd Prod {},{},{},{}".format(amp,group,j,i)))
 
                     prod = np.roll(prod,shift_dict[str(i)],axis=1)
 
                     nanlen = nancheck(prod)
                     if nanlen > 0:
-                        print("NAN 3rd Prod {},{},{},{}".format(amp,group,j,i))
+                        print(("NAN 3rd Prod {},{},{},{}".format(amp,group,j,i)))
 
                     #nanprod = np.isnan(prod)
                     #if len(np.where(nanprod==True)[0]) > 0:
@@ -665,7 +665,7 @@ def ipc_correction_image(orig,detector,save=False):
     nancorr = np.isnan(corr_image)
     if len(np.where(nancorr==True)[0]) > 0:
         print("nan corr!!")
-        print(len(np.where(nancorr==True)[0]))
+        print((len(np.where(nancorr==True)[0])))
 
 
     #save the correction image
@@ -705,7 +705,7 @@ def read_xtalk_file(file,detector):
             coeffs = xtcoeffs[i]
 
     if len(coeffs) == 0:
-        print('Detector not found in xtalk file: {}'.format(indet))
+        print(('Detector not found in xtalk file: {}'.format(indet)))
         sys.exit()
             
     return coeffs
@@ -728,13 +728,13 @@ def xtalk_correction_image(orig,detector,save=False):
     #xtalk_corr = copy.deepcopy(orig)
     xtalk_corr_im = np.zeros_like(orig)
     subamp_shift = {"0":1,"1":-1,"2":1,"3":-1}
-    for group in xrange(orig.shape[0]):
+    for group in range(orig.shape[0]):
         #print('group: ',group)
-        for amp in xrange(4):
+        for amp in range(4):
             #print('amp: ',amp)
             to_mult = orig[group,:,xtqstart[amp]:xtqstart[amp+1]]
             receivers = []
-            for i in xrange(4):
+            for i in range(4):
                 if i != amp:
                     receivers.append(i)
             #reverse the values to multply if the amps being used are adjacent or 3 amps apart
@@ -877,7 +877,7 @@ def pixels_with_signal(biasramp,biasramperr,biasframe,biasframeerr,detector,tgro
     #linfiles = glob.glob('/grp/jwst/wit/nircam/reference_files/SSB/CV2/delivery_Dec_2015/Linearity/*DMSorient.fits')
     linfiles = glob.glob('/ifs/jwst/wit/witserv/data7/nrc/reference_files/SSB/cv3_reffile_conversion/linearity/*ADU0*DMSorient.fits')
     lin_reffile = [s for s in linfiles if detector in s][0]
-    print('Using '+lin_reffile+' for linearity correction of pixels with signal.')
+    print(('Using '+lin_reffile+' for linearity correction of pixels with signal.'))
 
 
     #lin_reffile = lin_dir + lin_prefix[detector] + lin_base
@@ -896,7 +896,7 @@ def pixels_with_signal(biasramp,biasramperr,biasframe,biasframeerr,detector,tgro
     times = tgroup * np.arange(biasramp.shape[0])
 
     #print("WARNING: pixels_with_signal only working on amp 2 for code testing!!!!!!!!!!")
-    for amp in xrange(4):
+    for amp in range(4):
     #for amp in [2]:
         #biasframe_amp = biasframe[:,qstart[amp]:qstart[amp+1]]
         biasframe_amp = biasramp[-1,:,qstart[amp]:qstart[amp+1]]
@@ -909,10 +909,10 @@ def pixels_with_signal(biasramp,biasramperr,biasframe,biasframeerr,detector,tgro
 
         sigpix = np.where((biasframe_amp >= (pixclass.mean+nsig*pixclass.stdev)) | (biasframe_amp <= (pixclass.mean-nsig*pixclass.stdev)))
         perc = float_formatter(len(sigpix[0])/(510.*2040.)*100.)
-        print("Amp {}: {} pixels ({}% of total pixels) have appreciable signal and will be line-fit.".format(amp+1,len(sigpix[0]),perc))
+        print(("Amp {}: {} pixels ({}% of total pixels) have appreciable signal and will be line-fit.".format(amp+1,len(sigpix[0]),perc)))
             
         #loop over pixels with signal so that we can line-fit
-        for i in xrange(len(sigpix[0])):
+        for i in range(len(sigpix[0])):
         #for i in xrange(3):
             #print('x,y: ',str(sigpix[0][i]),str(sigpix[1][i]))
             signal = biasramp[:,sigpix[0][i],sigpix[1][i]]
@@ -936,24 +936,24 @@ def pixels_with_signal(biasramp,biasramperr,biasframe,biasframeerr,detector,tgro
                         offset, slope, offset_err, slope_err = linfit_yerror(times[0:cr],signal[0:cr],uncertainty[0:cr])
                         if np.isnan(offset):
                             print("NaN returned from line-fit")
-                            print("coordinates:",sigpix[0][i],sigpix[1][i])
-                            print("signal:",signal)
+                            print(("coordinates:",sigpix[0][i],sigpix[1][i]))
+                            print(("signal:",signal))
 
                     if cr == 2:
                         slope = (signal[cr-1] - signal[0]) / (times[cr-1] - times[0])
                         offset = signal[0] - slope*times[0]
                         if np.isnan(offset):
                             print("NaN returned from 2-group fit")
-                            print("coordinates:",sigpix[0][i],sigpix[1][i])
-                            print("signal:",signal)
+                            print(("coordinates:",sigpix[0][i],sigpix[1][i]))
+                            print(("signal:",signal))
 
                     if cr == 1:
                         slope = 0
                         offset = signal[0]
                         if np.isnan(offset):
                             print("NaN returned from one-group fit")
-                            print("coordinates:",sigpix[0][i],sigpix[1][i])
-                            print("signal:",signal)
+                            print(("coordinates:",sigpix[0][i],sigpix[1][i]))
+                            print(("signal:",signal))
 
                     cflag = 'red'
                 else:
@@ -966,24 +966,24 @@ def pixels_with_signal(biasramp,biasramperr,biasframe,biasframeerr,detector,tgro
                         slope = coeffs[2]
                         if np.isnan(offset):
                             print("NaN returned from 3rd order polynomial fit, pix with nan for lin coeffs")
-                            print("coordinates:",sigpix[0][i],sigpix[1][i])
-                            print("signal:",signal)
+                            print(("coordinates:",sigpix[0][i],sigpix[1][i]))
+                            print(("signal:",signal))
 
                     if ((cr<=4) & (cr > 1)):
                         slope = (signal[cr-1] - signal[0]) / (times[cr-1] - times[0])
                         offset = signal[0] - slope*times[0]
                         if np.isnan(offset):
                             print("NaN returned from 2-group fit in case where lin coeffs are nan")
-                            print("coordinates:",sigpix[0][i],sigpix[1][i])
-                            print("signal:",signal)
+                            print(("coordinates:",sigpix[0][i],sigpix[1][i]))
+                            print(("signal:",signal))
 
                     if cr == 1:
                         slope = 0
                         offset = signal[0]
                         if np.isnan(offset):
                             print("NaN returned from 1-group fit in case where nonlin coeffs are nan")
-                            print("coordinates:",sigpix[0][i],sigpix[1][i])
-                            print("signal:",signal)
+                            print(("coordinates:",sigpix[0][i],sigpix[1][i]))
+                            print(("signal:",signal))
 
 
                     cflag = 'blue'
@@ -997,25 +997,25 @@ def pixels_with_signal(biasramp,biasramperr,biasframe,biasframeerr,detector,tgro
                     offset, slope, offset_err, slope_err = linfit_yerror(times[0:cr],signal[0:cr],uncertainty[0:cr])
                     if np.isnan(offset):
                         print("NaN returned from line-fit in case of pixel with <500 counts")
-                        print("coordinates:",sigpix[0][i],sigpix[1][i])
-                        print("signal:",signal[0:cr])
-                        print("error:",uncertainty[0:cr])
-                        print("time:",times[0:cr])
+                        print(("coordinates:",sigpix[0][i],sigpix[1][i]))
+                        print(("signal:",signal[0:cr]))
+                        print(("error:",uncertainty[0:cr]))
+                        print(("time:",times[0:cr]))
                 if cr == 2:
                     slope = (signal[cr-1] - signal[0]) / (times[cr-1] - times[0])
                     offset = signal[0] - slope*times[0]
                     if np.isnan(offset):
                         print("NaN returned from 2-group fit in pixel with signal under 500 counts")
-                        print("coordinates:",sigpix[0][i],sigpix[1][i])
-                        print("signal:",signal)
+                        print(("coordinates:",sigpix[0][i],sigpix[1][i]))
+                        print(("signal:",signal))
 
                 if cr == 1:
                     slope = 0
                     offset = signal[0]
                     if np.isnan(offset):
                         print("NaN returned from 1-group fit for pixel with signal under 500 counts")
-                        print("coordinates:",sigpix[0][i],sigpix[1][i])
-                        print("signal:",signal)
+                        print(("coordinates:",sigpix[0][i],sigpix[1][i]))
+                        print(("signal:",signal))
 
 
                 cflag = 'green'
@@ -1038,10 +1038,10 @@ def pixels_with_signal(biasramp,biasramperr,biasframe,biasframeerr,detector,tgro
 
         biasframe[sigpix[0][i],sigpix[1][i]] = offset
         biasframeerr[sigpix[0][i],sigpix[1][i]] = offset_err
-        print("Pixel tracking, pixel with signal. Pixel ({},{}) = {}".format(checkx,checky,biasframe[checkx-4,checky-4]))
+        print(("Pixel tracking, pixel with signal. Pixel ({},{}) = {}".format(checkx,checky,biasframe[checkx-4,checky-4])))
 
         nancheck = np.ravel(np.isnan(biasframe))
-        print("after pixels_with_signal, number of nans: ",len(np.where(nancheck == True)[0]))
+        print(("after pixels_with_signal, number of nans: ",len(np.where(nancheck == True)[0])))
 
     return biasframe,biasframeerr
 
@@ -1214,8 +1214,8 @@ def create_superbias(tup):
 
     #fits file format checks
     check_ssb = fits.open(outdir+outfile)
-    print(check_ssb.info())
-    print(check_ssb['DQ_DEF'].data)
+    print((check_ssb.info()))
+    print((check_ssb['DQ_DEF'].data))
 
     #redcat team checks
     subprocess.call(['fitsverify',outdir+outfile])

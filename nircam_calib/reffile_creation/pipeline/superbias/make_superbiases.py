@@ -17,7 +17,7 @@ with open('individual_biases.list') as f:
 
 #in order to use average_bias.py, we need to create listfiles
 #for each combination of bias files that we want to combine
-for i in xrange(2,len(infiles)):
+for i in range(2,len(infiles)):
     ofiles = infiles[0:i]
     lfilename = 'ind_biases_1_to_'+str(i)+'.list'
     fout = open(lfilename,'wb')
@@ -29,7 +29,7 @@ for i in xrange(2,len(infiles)):
     print()
     print()
     print(ofiles)
-    print('saving superbias file as {}'.format(sbname))
+    print(('saving superbias file as {}'.format(sbname)))
     print()
     print()
     average_biases.run(lfilename,sbname)
