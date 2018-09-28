@@ -46,7 +46,7 @@ from optparse import OptionParser
 def isfinite(val):
     import types
     """Returns True if value is finite, else returns False"""
-    if type(val) is types.StringType:
+    if type(val) is bytes:
         if val in ['nan', 'inf']:  return False
 
     # Use 'repr' because the following doesn't work due to a bug in Python 2.3
@@ -101,7 +101,7 @@ def unique(seq):
     d = {}
     for x in seq:
        d[x] = 1
-    return d.keys()
+    return list(d.keys())
 
 def normflux25(flux, zp, zpnorm=25):
     return flux * 10**(-0.4*(zp-zpnorm))
@@ -132,7 +132,7 @@ def antivec(A, E, verbose=False):
     dof = (n*(n-1))/2 - (n-1)
     # Estimate an average weight
     wgtave = 0.0
-    if verbose:  print "Calculating wgtave:"
+    if verbose:  print("Calculating wgtave:")
     for j in range(n):
         for i in range(j):
 #            print i, j, E[i,j]
@@ -141,8 +141,8 @@ def antivec(A, E, verbose=False):
     # Normalize the weight
     wgtave /= (n*(n-1))/2;
 
-    if verbose:  print "N: ", n
-    if verbose:  print "wgtave: ", wgtave
+    if verbose:  print("N: ", n)
+    if verbose:  print("wgtave: ", wgtave)
 
     cov = zeros([n,n],floattype)     # Covariance matrix
     y   = zeros(   n ,floattype)     # work vector
@@ -164,8 +164,8 @@ def antivec(A, E, verbose=False):
 
     if verbose:
        #print "External weight matrix -- Determinant: %f " % la.determinant(cov)
-       print "External weight matrix -- Determinant: %f " % la.det(cov)
-       print cov
+       print("External weight matrix -- Determinant: %f " % la.det(cov))
+       print(cov)
 
     # Now we do a little inversion
 
@@ -176,18 +176,18 @@ def antivec(A, E, verbose=False):
     det = la.det(cov)
 
     if verbose:
-       print "External weight matrix after inversion -- Determinant: %f" % det
-       print cov
+       print("External weight matrix after inversion -- Determinant: %f" % det)
+       print(cov)
 
     # Calculate something
     for j in range(n):
         for i in range(n):
-            if verbose:  print "y[%2d]:  %f, cov[%2d,%2d]:  %f" % (i,y[i],i,j,cov[i,j])
+            if verbose:  print("y[%2d]:  %f, cov[%2d,%2d]:  %f" % (i,y[i],i,j,cov[i,j]))
             dVext[j] += y[i] * cov[i,j]
 
     for i in range(n):
         if verbose:
-            print "dVext[%d]: %f" % (i, dVext[i])
+            print("dVext[%d]: %f" % (i, dVext[i]))
         # 2006/02/25 - MWV:
         #   I don't entirely understand whether it's legitimate to
         #   take the sqrt of the absolute value, as Tonry does
@@ -217,8 +217,8 @@ def antivec(A, E, verbose=False):
 
     # Solve and multiply out to evaluate V
     if verbose:
-        print "Hessian matrix: <w> = %f" % wgtave
-        print cov
+        print("Hessian matrix: <w> = %f" % wgtave)
+        print(cov)
 
     # Another inversion of our now different covariance matrix
     #GSN - 20091109 - modify to work with numpy
@@ -284,8 +284,8 @@ def antivec(A, E, verbose=False):
     for j in range(n):  dVint[j] *= sqrt(chi/dof)
 
     if verbose:
-        print "Error matrix:"
-        print cov
+        print("Error matrix:")
+        print(cov)
 
     return (V, dVext, dVint)
 
@@ -313,9 +313,9 @@ class nn2:
         (V, S, WT) = la.svd(self.A)
         (self.V, self.dVext, self.dVint) = antivec(self.A, self.E, verbose=verbose)
         if debug:
-            print "V  vector: ", V
-            print "S  matrix: ", S
-            print "WT matrix: ", WT
+            print("V  vector: ", V)
+            print("S  matrix: ", S)
+            print("WT matrix: ", WT)
 
         self.Verr = sqrt(self.dVint**2 + self.dVext**2)
 
@@ -354,8 +354,8 @@ class nn2:
                 zerodates = [i for (i, d) in enumerate(self.dates) if d <= maxMJD]
 
         if zerodates is None or len(zerodates) <= 0:
-            print "NN2: No points found in given MJD range to use as zero points for this filter."
-            print "NN2: Leaving points unchanged."
+            print("NN2: No points found in given MJD range to use as zero points for this filter.")
+            print("NN2: Leaving points unchanged.")
             return
 
         # There's got to be a better way of doing the following masked array stuff
@@ -384,25 +384,25 @@ class nn2:
                  if f is not ma.masked and f < clipsigma]
 
             if len(w) <= 0:
-                print "No good zero flux points"
-                print "No flux zero applied to points."
+                print("No good zero flux points")
+                print("No flux zero applied to points.")
 
             try:
                 zerofluxnorm  = ma.average(zeroflux[w], weights=1./(zerofluxerr[w]*zerofluxerr[w]))
                 this_resid = residual[w] * residual[w]
                 zerofluxchisq = this_resid.sum()
-                print zerofluxchisq
+                print(zerofluxchisq)
                 dof = len(residual) - 1
                 zerofluxchisqnu = zerofluxchisq / dof
-                print "Chi^2/DoF of zero points :  %f / %f  = %f " % ( zerofluxchisq, dof, zerofluxchisqnu )
+                print("Chi^2/DoF of zero points :  %f / %f  = %f " % ( zerofluxchisq, dof, zerofluxchisqnu ))
             except 'DIE':
                 zerofluxnorm = 0.
                 zerofluxchisq = 0.
                 dof = 0.
 
         else:
-            print "zerotype == '%s' unknown or not yet supported." % (zerotype)
-            print "No flux zero applied to points."
+            print("zerotype == '%s' unknown or not yet supported." % (zerotype))
+            print("No flux zero applied to points.")
             zerofluxnorm = 0.
 
         # Subtract the fiducial flux
@@ -477,7 +477,7 @@ class nn2plot(nn2):
 #        pylab.ylabel("Error matrix: E(i,j)")
         # I'm abusing the 'title' attribute here just to get the x2label where I want it
         pylab.title("Error matrix: E(i,j)")
-        print self.dates
+        print(self.dates)
         datelabels = self.mjd2date(self.dates)
         datelabels.reverse()
         pylab.yticks(arange(len(self.A),0,-1),(datelabels))
@@ -494,8 +494,8 @@ class nn2plot(nn2):
     def pruneMatrix(self, verbose=False):
         n = len(self.A)
 
-        if verbose:  print "Pruning matrix"
-        if verbose:  print "N: ", n
+        if verbose:  print("Pruning matrix")
+        if verbose:  print("N: ", n)
 
         # Construct our list of bad dates
         #    sum(self.A[i,:] == zeros(n))
@@ -511,7 +511,7 @@ class nn2plot(nn2):
                 baddates[i] = True
                 numbad += 1
 
-        if verbose:  print "Bad: ", baddates, "numbad: ", numbad
+        if verbose:  print("Bad: ", baddates, "numbad: ", numbad)
 
         numgooddates = n-numbad
 
@@ -527,10 +527,10 @@ class nn2plot(nn2):
         self.gooddates = []
         newn = 0
         good = []
-        for (oldi, bad, date) in zip(range(n), baddates, olddates):
+        for (oldi, bad, date) in zip(list(range(n)), baddates, olddates):
             if bad: continue
             newn += 1
-            if verbose:  print "newn: %d" % newn
+            if verbose:  print("newn: %d" % newn)
             good.append(oldi)
             self.gooddates.append(date)
             for i in range(newn):  newA[i,newn-1] = oldA[good[i],newn-1]
@@ -668,8 +668,8 @@ class nn2analyze:
 
                # Keep MJD dates as strings for now to use as hashes later if needed
 
-               if not self.refdate.has_key(p):  self.refdate[p] = []
-               if not self.date.has_key(p):  self.date[p] = []
+               if p not in self.refdate:  self.refdate[p] = []
+               if p not in self.date:  self.date[p] = []
 
                self.refdate[p].append(rd)
                self.date[p].append(d)
@@ -681,24 +681,24 @@ class nn2analyze:
                self.observation[(rd,p)]   = templ
 
         except e:
-            print e
-            print "Unable to process file:  %s" % self.lcfile
+            print(e)
+            print("Unable to process file:  %s" % self.lcfile)
             return False
 
-        if self.options.verbose:  print self.date
-        if self.options.verbose:  print "Flux: ", self.flux
-        if self.options.verbose:  print "dFlux: ", self.dflux
-        if self.options.verbose:  print "zeropoint: ", self.zeropoint
+        if self.options.verbose:  print(self.date)
+        if self.options.verbose:  print("Flux: ", self.flux)
+        if self.options.verbose:  print("dFlux: ", self.dflux)
+        if self.options.verbose:  print("zeropoint: ", self.zeropoint)
 
         # Create some derivative arrays
         self.alldates = {}
-        self.uniqphotcodes = unique(self.photcode.values())
+        self.uniqphotcodes = unique(list(self.photcode.values()))
 #        print "photcode: ", self.uniqphotcodes
         for p in self.uniqphotcodes:
-            if self.options.verbose:  print "p: ", p
+            if self.options.verbose:  print("p: ", p)
             self.alldates[p] = unique(self.date[p]+self.refdate[p])
             self.alldates[p].sort()
-            if self.options.verbose:  print "sorted all dates: ", self.alldates[p]
+            if self.options.verbose:  print("sorted all dates: ", self.alldates[p])
             self.gooddates[p] = self.alldates[p]  # All dates good by default
 
         # For now just make observation the same as gooddates.  Eventually, it needs to be the filename or something
@@ -712,7 +712,7 @@ class nn2analyze:
         index = {}
         for i in range(len(self.alldates[p])):
              index[self.alldates[p][i]] = i
-        if self.options.verbose:  print len(self.alldates[p])
+        if self.options.verbose:  print(len(self.alldates[p]))
 
         dates   = [None for i in range(len(self.alldates[p]))] # Create blank date array
         rddates = [None for i in range(len(self.alldates[p]))] # Create blank date array
@@ -726,12 +726,12 @@ class nn2analyze:
         #                    self.A[i,j] = normflux25(self.flux[(i,j)] , self.zeropoint[(i,j)])
         #                    self.E[i,j] = normflux25(self.dflux[(i,j)], self.zeropoint[(i,j)])
 
-        if self.options.verbose:  print "Filling A, E matrices:"
+        if self.options.verbose:  print("Filling A, E matrices:")
         for (rd,d) in zip(self.refdate[p],self.date[p]):
             i = index[rd]
             j = index[ d]
             zp = self.zeropoint[(rd,d,p)]
-            if self.options.verbose:  print i,j,zp, d, rd
+            if self.options.verbose:  print(i,j,zp, d, rd)
             if zp > 0:
                 # We have to do both of these to make
                 # sure we get the dates for both images in the subtraction
@@ -753,10 +753,10 @@ class nn2analyze:
         for i in range(len(dates)):
             if dates[i] is None:
                 if self.options.verbose:
-                     print "setting dates[%d] = rddates[%d]" % (i, i), dates[i], rddates[i]
+                     print("setting dates[%d] = rddates[%d]" % (i, i), dates[i], rddates[i])
                 dates[i] = rddates[i]
 
-        if self.options.verbose:  print "createMatrix: dates: ", dates
+        if self.options.verbose:  print("createMatrix: dates: ", dates)
 
         self.matrix[p] = nn2plot(dates, A, E)
 
@@ -775,18 +775,18 @@ class nn2analyze:
 #        if self.options.verbose:  print "origE: ", self.origE
 
 #        if self.options.verbose:  print "goodates: ", self.gooddates
-        if self.options.verbose:  print "A: ", self.matrix[p].A
-        if self.options.verbose:  print "E: ", self.matrix[p].E
+        if self.options.verbose:  print("A: ", self.matrix[p].A)
+        if self.options.verbose:  print("E: ", self.matrix[p].E)
 
 
     ### Prune isolated dates from matrices
     def pruneMatrices(self):
-        for k in self.matrix.keys():
+        for k in list(self.matrix.keys()):
                 self.matrix[k].pruneMatrix(verbose=self.options.verbose)
         # We do this twice to see if there was a date left out
         #  that's now isolated or has only one.
         # Clearly this could go on forever, but we'll say two is good
-        for k in self.matrix.keys():
+        for k in list(self.matrix.keys()):
                 self.matrix[k].pruneMatrix(verbose=self.options.verbose)
 
     def LCheader(self):
@@ -805,7 +805,7 @@ class nn2analyze:
         for p in photcode:
 
             for (d,f,df,dfext,dfint) in zip(self.matrix[p].dates, self.matrix[p].V, self.matrix[p].Verr, self.matrix[p].dVext, self.matrix[p].dVint):
-                if (d,p) in self.observation.keys():
+                if (d,p) in list(self.observation.keys()):
                     o = self.observation[(d,p)]
                 else:
                     o = d
@@ -820,8 +820,8 @@ class nn2analyze:
 #        print "Printing lightcurve [MJD, flux, flux err (ext), flux err (int)]"
 #        for (d,f,df,dfint) in zip(self.gooddates, self.V, self.dVext, self.dVint):
 #            print d,f,df,dfint
-        print "Printing lightcurve: "
-        print self.LCstring(photcode)
+        print("Printing lightcurve: ")
+        print(self.LCstring(photcode))
 
     def outputFilename(self):
         self.outfile = self.lcfile.replace('.lc.dat','.nn2.dat')
@@ -835,7 +835,7 @@ class nn2analyze:
 
     def saveLightcurve(self):
         self.outputFilename()
-        print "Saving lightcurve to '%s'" % self.outfile
+        print("Saving lightcurve to '%s'" % self.outfile)
         open(self.outfile,'w').write(self.LCstring())
 
     def plotLightcurve(self, photcode=None):
@@ -843,9 +843,9 @@ class nn2analyze:
         if photcode is None:  photcode = self.uniqphotcodes
         if not isinstance(photcode, list):  photcode = [photcode]
 
-        print photcode
+        print(photcode)
         for p in photcode:
-            print "Plotting ", p
+            print("Plotting ", p)
             self.matrix[p].plotline()
 
         pylab.xlabel("MJD")
@@ -915,15 +915,15 @@ class nn2analyze:
         (self.options, self.args) = self.getoptions(sys.argv[1:])
 
         if len(self.args) <= 0:
-           print self.usage
+           print(self.usage)
            sys.exit()
 
         lcfile = self.args[0]
         self.lcfile = lcfile
 
         if not self.loadFile():
-            print "Couldn't load lightcurve file: '%s'" % self.lcfile
-            print "Giving up."
+            print("Couldn't load lightcurve file: '%s'" % self.lcfile)
+            print("Giving up.")
 #            print "Usage:"
 #            print self.usage
             sys.exit(101)
@@ -942,13 +942,13 @@ class nn2analyze:
             try:
                 self.matrix[p].solveMatrix(verbose=self.options.verbose)
             except 'DIE':
-                print "Unable to solve matrix.  It's possible the matrix was singular."
-                print "Try using the --visualize option "
-                print "  to see how well the lightcurve difference matrix is filled in."
+                print("Unable to solve matrix.  It's possible the matrix was singular.")
+                print("Try using the --visualize option ")
+                print("  to see how well the lightcurve difference matrix is filled in.")
                 sys.exit(111)
 
             if self.options.norm:
-                print "Subtracting baseline flux for photcode: ", p
+                print("Subtracting baseline flux for photcode: ", p)
                 self.matrix[p].normToPoints(minMJD=self.options.zeroMJDmin,
                                             maxMJD=self.options.zeroMJDmax,
                                             zerotype=self.options.zerotype,
