@@ -6,7 +6,7 @@ This is the updated version that works with data processed using Build 5
 of the SSB pipeline. The difference is that in Build 4, the bias_drift step
 included a 0th read subtraction, refpix correction, then 0th read was added back
 in. In Build 5 the software assumes that a superbias has already been subtracted
-and so the bias_drift step (which has been renamed to refpix) performs the 
+and so the bias_drift step (which has been renamed to refpix) performs the
 refpix correction without doing anything special with the 0th read.
 '''
 
@@ -19,11 +19,10 @@ import argparse,sys
 import os,shutil,time
 import copy,sys,glob
 import subprocess
-from jwst_lib.models import SuperBiasModel
 #sys.path.append('/user/hilbert/detector_test/python_procs/nircam/utils/')
-from jwst.datamodels import dqflags
+from jwst.datamodels import SuperBiasModel, dqflags
 from jwst.ipc import IPCStep
-import sigmacut
+from nircam_calib.tools.math import sigmacut
 
 #qstart = [0,510,1020,1530,2040]
 
@@ -37,11 +36,11 @@ def calculate_means(data,boxwidth,edge_truncate=True):
     from numpy import nanmean,nanmedian,nanstd
     #given a 2D array of many differences for a single row,
     #calulate and return the means and uncertainties for every
-    #boxwidth pixel. 
+    #boxwidth pixel.
     #NOTE: if boxwidth=100, then we will calculate the mean in a
     #box that is +/-50 pixels around the central pixel. Later, the
     #solution will be applied within a box +/-25 pixels around the
-    #central pixel. This implies that we need overlap between 
+    #central pixel. This implies that we need overlap between
     #boxes. So for boxwidth of 100, we perform the calculation
     #centered around every 50th pixel.
     targets = np.arange(0,data.shape[1],boxwidth/2)
@@ -50,12 +49,11 @@ def calculate_means(data,boxwidth,edge_truncate=True):
     for group in range(data.shape[0]):
         for i,center in enumerate(targets):
             if center < boxwidth/2:
-                pix = data[group,0:boxwidth/2+1]
+                pix = data[group,0:int(boxwidth/2+1)]
             elif data.shape[1]-boxwidth/2 < (boxwidth/2):
-                pix = data[group,data.shape[1]-boxwidth/2:]
+                pix = data[group,int(data.shape[1]-boxwidth/2):]
             else:
-                pix = data[group,center-(boxwidth/2.):center+(boxwidth/2.)+1]
-                    
+                pix = data[group,int(center-(boxwidth/2.)):int(center+(boxwidth/2.)+1)]
             #sigma-clip
             #sig = nanstd(pix)
             #mn = nanmedian(pix)
@@ -66,7 +64,7 @@ def calculate_means(data,boxwidth,edge_truncate=True):
             #    good = (pix < (mn + 3.*sig)) & (pix > (mn-3.*sig))
             #means[group,i] = mn
             #uncs[group,i] = sig
-                
+
             #update to use Armin's sigma clipping class
             pix = np.ravel(pix)
             goodpts = ~np.isnan(pix)
@@ -83,9 +81,9 @@ def calculate_means(data,boxwidth,edge_truncate=True):
             #    print(group,i,center)
             #    print(pix)
             #    print(pixclass.mean)
-            
+
     return(means,uncs,targets)
-        
+
 
 def correct_1overf(data,filename,boxwidth,appwidth):
     from . import nn2
@@ -150,7 +148,7 @@ def correct_1overf(data,filename,boxwidth,appwidth):
             #print(rowdata[:,10])
 
             #calculate the matrix of differences
-            diffrowdata = np.zeros((zd*(zd-1)/2,xd))
+            diffrowdata = np.zeros((int(zd*(zd-1)/2),xd))
             outidx = 0
             for idx in range(zd):
                 for idx2 in range(idx+1,zd):
@@ -158,10 +156,10 @@ def correct_1overf(data,filename,boxwidth,appwidth):
                     diffrowdata[outidx,:] = rowdata[idx,:] - rowdata[idx2,:]
                     outidx = outidx + 1
 
-                
+
             #print('diffrowdata, pixel 10')
             #print(diffrowdata[:,10])
-                
+
 
             #calculate the means in overlapping boxes of size boxwidth
             #output means,uncs are 2d arrays, groups x number of boxes in the row
@@ -176,7 +174,7 @@ def correct_1overf(data,filename,boxwidth,appwidth):
             #save the means as a check for debugging
             meancheck[rownum,11*amp:11*amp+11] = means[0,:]
 
-               
+
             #Now we need to work on each meanbox of the row. For each box, construct
             #the NxN matrix of all possible difference values. This matrix is then fed
             #into the NN2 machinery.
@@ -191,7 +189,7 @@ def correct_1overf(data,filename,boxwidth,appwidth):
                 #print('means for individual box',box)
                 #print(means[:,box])
 
-                    
+
                 allmeans = zeros((zd,zd))
                 alluncs = zeros_like(allmeans)
                 idx = 0
@@ -216,8 +214,8 @@ def correct_1overf(data,filename,boxwidth,appwidth):
 
                 #print('alluncs')
                 #print(alluncs[:,0:5])
-                    
-                        
+
+
                 #pass the means and uncertainties to the NN2 engine
                 nn2inst = nn2.nn2()
                 nn2inst.A = allmeans
@@ -230,7 +228,7 @@ def correct_1overf(data,filename,boxwidth,appwidth):
 
                 #save the NN2 output vector and uncertainty vector for each pixel. We also
                 #need the mean vector, for later subtraction
-                for xpt in range(qstart[amp]+targx[box]-(appwidth/2),qstart[amp]+targx[box]+(appwidth/2)):
+                for xpt in range(qstart[amp]+targx[box]-int(appwidth/2),qstart[amp]+targx[box]+int(appwidth/2)):
                     #print('qstart[amp] ',qstart[amp],'targx[box] ',targx[box],'appwidth/2 ',appwidth/2,'appwidth/2 ',appwidth/2)
                     if xpt >= (qstart[amp]) and xpt < (qstart[amp+1]):
                         #print('box ',box,'xpt ',xpt)
@@ -239,7 +237,7 @@ def correct_1overf(data,filename,boxwidth,appwidth):
                         nn2corrmean[rownum,xpt] = np.mean(nn2inst.V)
                         nn2corrmeanunc[rownum,xpt] = np.std(nn2inst.V) / np.sqrt(len(nn2inst.V))
 
-                    
+
                 ##for debugging. Let's try a version where we just use 'means' rather than sending
                 ##signal differences through nn2.
                 #for xpt in xrange(qstart[amp]+targx[box]-(appwidth/2),qstart[amp]+targx[box]+(appwidth/2+1)):
@@ -274,7 +272,7 @@ def correct_1overf(data,filename,boxwidth,appwidth):
     #hdum.writeto('meancheck.fits',clobber=True)
 
 
-    #now from the original data, subtract the nn2 vectors, but also the nn2 means, such that on 
+    #now from the original data, subtract the nn2 vectors, but also the nn2 means, such that on
     #average, we're subtracting zero.
     #print('original data')
     #print(data[:,1499,23])
@@ -309,7 +307,7 @@ def mean_refpixframe(data):
     #compute the simple mean of each reference pixel for use in the superbias
     #with only 30(?) reads, we probably don't have enough samples to make a sigma-clipped mean, right?
     rpixframe = np.zeros(2048,2048)
-        
+
     top = data[:,2044:,:]
     top_mean = np.mean(top,axis=0)
     bottom = data[:,0:4,:]
@@ -324,7 +322,7 @@ def mean_refpixframe(data):
     rpixframe[:,4:2044,0:4] = left_mean
     rpixframe[:,4:2044,2044:] = right_mean
     return rpixframe
-        
+
 
 def bias_from_file(filename,boxwidth,appwidth,groupstart,groupend,integration,skipnn2,ipc,xtalk,showplots=False,saveplots=False):
 
@@ -348,7 +346,7 @@ def bias_from_file(filename,boxwidth,appwidth,groupstart,groupend,integration,sk
             data = data[integration,:,:,:]
         else:
             data = data[0,:,:,:]
-    
+
 
 
     #chop to save time in testing
@@ -371,7 +369,7 @@ def bias_from_file(filename,boxwidth,appwidth,groupstart,groupend,integration,sk
         print("groupstart is either negative or too large for the input file. Quitting.")
         print(groupstart)
         sys.exit
-                
+
 
     #print("input data:")
     #print(data[0,518+4,472+4],data[0,518+4,545+4])
@@ -382,7 +380,7 @@ def bias_from_file(filename,boxwidth,appwidth,groupstart,groupend,integration,sk
 
     #remove reference pixels
     if data.shape[1] == 2048:
-        #top = data[:,2044:,:] 
+        #top = data[:,2044:,:]
         #bottom = data[:,0:4,:]
         #left = data[:,4:2044,0:4]
         #right = data[:,4:2044,2044:]
@@ -408,11 +406,11 @@ def bias_from_file(filename,boxwidth,appwidth,groupstart,groupend,integration,sk
     #    tmp = data[i,:,:]
     #    tmp[mask] = np.nan
         #no need to put tmp back into data, because python is scary like that.
-        
 
-    #uncertainty in the data. At the moment, pipline-output files have 0s in the 
+
+    #uncertainty in the data. At the moment, pipline-output files have 0s in the
     #error arrays, so we need to create our own errors. Since the dark current signal
-    #is negligible, let's just use single frame readnoise. 
+    #is negligible, let's just use single frame readnoise.
     ron = 6.
 
     #print("Pixel tracking, read in data. Pixel ({},{}) = {}".format(checkx,checky,data[0,checkx-4,checky-4]))
@@ -468,18 +466,18 @@ def bias_from_file(filename,boxwidth,appwidth,groupstart,groupend,integration,sk
         print('Subtracting 1/f correction from data')
     else:
         #diff = data
-        #diffunc = np.zeros_like(diff) 
+        #diffunc = np.zeros_like(diff)
         #diffunc[:,:,:] = self.ron
         print("1/f correction using NN2 skipped. Need to figure out true uncertainties in this case!!!!!!!!")
         sb_unc = np.sqrt(np.absolute(sb_data[:,4:2044,4:2044]) + ron*ron)
-        
+
     #print("Need to figure out what to do for uncertainties on the original data. values are 0 in fits I checked.")
 
 
     #NaN check
     #nandata = nancheck(data[:,100:300,:])
     #print("nan data after nn2! {} pixels!".format(nandata))
-    
+
     #nnn1 = nancheck(data)
     #if nnn1 > 0:
     #    print("nnn1 check: {} pixels.".format(nnn1))
@@ -517,7 +515,7 @@ def bias_from_file(filename,boxwidth,appwidth,groupstart,groupend,integration,sk
         xhdu = fits.PrimaryHDU(xtalk_corr)
         xhdu.writeto('xtalk_correction_image_for_integration'+str(integration)+'_of_'+filename,clobber=True)
 
-    #print('After IPC and XTALK: ',sb_data[0:10,1499,200])        
+    #print('After IPC and XTALK: ',sb_data[0:10,1499,200])
 
 
     ##now subtract all the correction images from the original data
@@ -525,10 +523,10 @@ def bias_from_file(filename,boxwidth,appwidth,groupstart,groupend,integration,sk
     #diff = original_data - (nn2corrdata-nn2corrmean) - ipc_image - xtalk_image
     #print('include ipc and xtalk uncertainties here????')
     #diffunc = np.sqrt(nn2corrdataerr*nn2corrdataerr + nn2corrmeanunc*nn2corrmeanunc + ron*ron)
-    
+
     #add reference pixels back in to sb_unc
     sb_unc_full = np.zeros((sb_unc.shape[0],2048,2048))
-    sb_unc_full[:,2044:,:] = ron 
+    sb_unc_full[:,2044:,:] = ron
     sb_unc_full[:,0:4,:] = ron
     sb_unc_full[:,4:2044,0:4] = ron
     sb_unc_full[:,4:2044,2044:] = ron
@@ -536,12 +534,12 @@ def bias_from_file(filename,boxwidth,appwidth,groupstart,groupend,integration,sk
 
     #print('check uncertainties here! is diffunc what you really want???')
     return (sb_data,sb_unc_full)
-    
+
 def poor_mans_bias(orig):
     #quick bias correction. Subtract 0th read, and make an adjustment for the signal between reset
     #and read 0, approximating it as the sigal between reads 0 and 1.
     print("Performing poor man's bias correction.")
-        
+
     #save the correction image
     #pmbhdu = fits.PrimaryHDU(orig[0,:,:] - (orig[1,:,:]-orig[0,:,:]))
     #pmbhdu.writeto('poor_mans_bias_image.fits',clobber=True)
@@ -565,7 +563,7 @@ def ipc_correction_image(orig,detector,save=False):
     #ipc_prefix = {'NRCA1':'NRCA1_16989','NRCA2':'None','NRCA3':'NRCA3_17024','NRCA4':'NRCA4_17048','NRCALONG':'NRCA5_17158','NRCB1':'NRCB1_16991','NRCB2':'NRCB2_17005','NRCB3':'NRCB3_17011','NRCB4':'NRCB4_17047','NRCBLONG':'NRCB5_17161'}
     ipc_prefix = {'NRCA1':'NRCA1_17004','NRCA2':'NRCA2_17006','NRCA3':'NRCA3_17012','NRCA4':'NRCA4_17048','NRCALONG':'NRCA5_17158','NRCB1':'NRCB1_16991','NRCB2':'NRCB2_17005','NRCB3':'NRCB3_17011','NRCB4':'NRCB4_17047','NRCBLONG':'NRCB5_17161'}
     ipc_base = '_IPCDeconvolutionKernel_2016-03-18_ssbipc.fits'
-        
+
     ipc_kernel_file = ipc_dir + ipc_prefix[detector] + ipc_base
     ipchdu = fits.open(ipc_kernel_file)
     kernel = ipchdu[1].data
@@ -574,13 +572,13 @@ def ipc_correction_image(orig,detector,save=False):
     #print("KERNEL:")
     #print(kernel)
 
-        
+
     #orig[:,350,350] = orig[:,350,350] + 40000.
     #orig[:,350,351] = orig[:,350,351] + 200.
     #orig[:,350,349] = orig[:,350,349] + 200.
     #orig[:,351,350] = orig[:,351,350] + 200.
     #orig[:,349,350] = orig[:,349,350] + 200.
-    
+
 
     shift_dict = {'0':1,'1':0,'2':-1}
     #perform IPC correction
@@ -604,7 +602,7 @@ def ipc_correction_image(orig,detector,save=False):
     #print(orig[:,300+hot[0][0]+1,hot[1][0]])
 
     corr_image = np.zeros_like(orig)
-    
+
     for amp in range(4):
         subframe = orig[:,:,qstart[amp]:qstart[amp+1]]
 
@@ -612,7 +610,7 @@ def ipc_correction_image(orig,detector,save=False):
         if len(np.where(nansubframe == True)[0]) > 0:
             print("nan subframe!!")
             print((len(np.where(nansubframe == True)[0])))
-            
+
 
         app_kernel = kernel
         if ((amp == 1) | (amp == 3)):
@@ -646,7 +644,7 @@ def ipc_correction_image(orig,detector,save=False):
                     #    print("NAN prod!")
                     #    print(j,i,group,amp)
                     #    print(len(np.where(nanprod==True)[0]))
-                    
+
                     #print('prod:',prod[350,350])
                     summed_image = summed_image + prod
 
@@ -661,7 +659,7 @@ def ipc_correction_image(orig,detector,save=False):
             #print(summed_image[300+hot[0][0]+1,hot[1][0]])
             #print('Finished, group {}, summed image:'.format(group))
             #print(summed_image[349:352,349:352])
-        
+
     nancorr = np.isnan(corr_image)
     if len(np.where(nancorr==True)[0]) > 0:
         print("nan corr!!")
@@ -707,15 +705,15 @@ def read_xtalk_file(file,detector):
     if len(coeffs) == 0:
         print(('Detector not found in xtalk file: {}'.format(indet)))
         sys.exit()
-            
+
     return coeffs
-        
+
 
 def xtalk_correction_image(orig,detector,save=False):
     print('Generating crosstalk correction image')
     xtfile = 'xtalk20150303g0.errorcut.txt'
     coeffs = read_xtalk_file(xtfile,detector)
-        
+
     #print('coefficients read in')
 
     #need to tack refpix back on in order to have all four quadrants be the same width
@@ -747,7 +745,7 @@ def xtalk_correction_image(orig,detector,save=False):
                 if (np.absolute(amp-subamp) == 2):
                     #print('line642')
                     corr_amp = to_mult * coeffs[index]
-            
+
                 xtalk_corr_im[group,:,xtqstart[subamp]:xtqstart[subamp+1]] = xtalk_corr_im[group,:,xtqstart[subamp]:xtqstart[subamp+1]] + corr_amp
 
 
@@ -759,7 +757,7 @@ def xtalk_correction_image(orig,detector,save=False):
                 index = 'xt'+str(amp+1)+str(subamp+1)+'post'
                 if ((np.absolute(amp-subamp) == 1) | (np.absolute(amp-subamp) == 3)):
                     #print('line655')
-                    corr_amp = np.fliplr(to_mult) * coeffs[index] 
+                    corr_amp = np.fliplr(to_mult) * coeffs[index]
                     corr_amp = np.roll(corr_amp,subamp_shift[str(subamp)],axis=1)
                 if (np.absolute(amp-subamp) == 2):
                     #print('line659')
@@ -767,7 +765,7 @@ def xtalk_correction_image(orig,detector,save=False):
                     corr_amp = np.roll(corr_amp,subamp_shift[str(subamp)])
 
                 xtalk_corr_im[group,:,xtqstart[subamp]:xtqstart[subamp+1]] = xtalk_corr_im[group,:,xtqstart[subamp]:xtqstart[subamp+1]] + corr_amp
-                    
+
     #strip the refpix back off
     xtalk_corr_im = xtalk_corr_im[:,:,4:2044]
 
@@ -781,16 +779,16 @@ def xtalk_correction_image(orig,detector,save=False):
     #print(xtalk_corr_im[0,518,472],xtalk_corr_im[0,518,543])
 
     return xtalk_corr_im
-                        
-                    
-    
+
+
+
 def collapse(ramp,err):
     #take 3D array of original data - NN2 output (calculated in bias_from_file)
     #and take the mean in each pixel along all reads. This will create a mean bias
     #frame.
     print("Averaging together the bias frames from all reads into a single superbias")
     mns = np.average(ramp,axis=0,weights=1./err)
-        
+
     #error propagation
     uncs = np.std(ramp,axis=0)/np.sqrt(ramp.shape[0])
     return (mns,uncs)
@@ -799,14 +797,14 @@ def collapse(ramp,err):
 def collapse_median(ramp,err):
     #same as collapse above, but uses a median rather than a weighted average
     mns = np.median(ramp,axis=0)
-        
+
     #error propagation
     uncs = np.std(ramp,axis=0)/np.sqrt(ramp.shape[0])
     return (mns,uncs)
-        
+
 
 def unreliable_bias(biaserr,sigmacut=5):
-    #Find pixels with large variances in the bias, and flag these 
+    #Find pixels with large variances in the bias, and flag these
     #for the DQ extension
 
     #calculate the mean variance across the detector
@@ -839,7 +837,7 @@ def linfit_yerror(x,y,yerr):
     ynan = np.isnan(y)
     x[ynan] = np.nan
     yerr[ynan] = np.nan
-    
+
     #sum over only the non-nan points
     good = ~np.isnan(x)
 
@@ -856,7 +854,7 @@ def linfit_yerror(x,y,yerr):
     slope_b_err  = np.sqrt(1.0/delta * sumis2)
     return offset_a, slope_b, offset_a_err, slope_b_err
 
- 
+
 
 
 def pixels_with_signal(biasramp,biasramperr,biasframe,biasframeerr,detector,tgroup,nsig=9):
@@ -891,7 +889,7 @@ def pixels_with_signal(biasramp,biasramperr,biasframe,biasframeerr,detector,tgro
     #print("Pixel tracking, linearity coeffs. Pixel ({},{}) = {}".format(checkx,checky,lin_coeff[3,checkx-4,checky-4]))
 
 
-    #what is 'significant' signal? work amp by amp, calculate the amp mean and stdev. 
+    #what is 'significant' signal? work amp by amp, calculate the amp mean and stdev.
     #significant signal is > N-sigma above the mean? or just > N DN above the mean?
     times = tgroup * np.arange(biasramp.shape[0])
 
@@ -900,7 +898,7 @@ def pixels_with_signal(biasramp,biasramperr,biasframe,biasframeerr,detector,tgro
     #for amp in [2]:
         #biasframe_amp = biasframe[:,qstart[amp]:qstart[amp+1]]
         biasframe_amp = biasramp[-1,:,qstart[amp]:qstart[amp+1]]
-            
+
         nanpts = np.isnan(biasframe_amp)
         pixclass = sigmacut.calcaverageclass()
         pixclass.calcaverage_sigmacutloop(biasframe_amp,Nsigma=3,saveused=True,mask=nanpts)
@@ -910,7 +908,7 @@ def pixels_with_signal(biasramp,biasramperr,biasframe,biasframeerr,detector,tgro
         sigpix = np.where((biasframe_amp >= (pixclass.mean+nsig*pixclass.stdev)) | (biasframe_amp <= (pixclass.mean-nsig*pixclass.stdev)))
         perc = float_formatter(len(sigpix[0])/(510.*2040.)*100.)
         print(("Amp {}: {} pixels ({}% of total pixels) have appreciable signal and will be line-fit.".format(amp+1,len(sigpix[0]),perc)))
-            
+         
         #loop over pixels with signal so that we can line-fit
         for i in range(len(sigpix[0])):
         #for i in xrange(3):
@@ -1034,7 +1032,7 @@ def pixels_with_signal(biasramp,biasramperr,biasframe,biasframeerr,detector,tgro
 
             f.savefig('pixels_with_signal/linfit_pixel_amp_'+str(amp)+'_'+str(sigpix[0][i])+'_'+str(sigpix[1][i])+'.png')
             plt.close(f)
-                
+
 
         biasframe[sigpix[0][i],sigpix[1][i]] = offset
         biasframeerr[sigpix[0][i],sigpix[1][i]] = offset_err
@@ -1045,11 +1043,11 @@ def pixels_with_signal(biasramp,biasramperr,biasframe,biasframeerr,detector,tgro
 
     return biasframe,biasframeerr
 
-      
+
 def cr_check(time,signal,nsig):
     #Given a list of signals and times, do a crude CR check
     #Return the read number in which the CR appears, or the total number of reads if none.
-  
+
     rates = (np.roll(signal,-1) - signal) / (np.roll(time,-1) - time)
     rates = rates[0:-1]
     nanpts = np.isnan(rates)
@@ -1067,7 +1065,7 @@ def cr_check(time,signal,nsig):
         cr = len(signal)
 
     return cr
-        
+
 
 def create_superbias(tup):
 
@@ -1082,7 +1080,7 @@ def create_superbias(tup):
     8.average together all groups
     9.average together all files
     '''
-    
+
     listfile,boxsize,width,showplots,saveplots,outdir,outfile,fulledge,skipnn2,groupstart,groupend,integration,ipc,xtalk = tup
 
 
@@ -1091,7 +1089,7 @@ def create_superbias(tup):
     with open(listfile,'r') as fin:
         for line in fin:
             files.append(line.strip())
-        
+
     #check dimensions of files we'll be working with so we can set up final variables
     ext = files[0][-4:]
     if ext == 'fits':
@@ -1151,7 +1149,7 @@ def create_superbias(tup):
         finalbiaserr = allbiaserr[0,:,:]
         finaldq = np.zeros((2048,2048))
 
-    #create dq_def 
+    #create dq_def
     finaldqdef = []
     dqssb={'DO_NOT_USE':np.uint8(1),'UNRELIABLE_BIAS':np.uint8(2)}
     for bitname in dqssb:
@@ -1177,15 +1175,15 @@ def create_superbias(tup):
     slashpos = outdir.rfind('/')
     if slashpos != len(outdir)-1:
         outdir = outdir + '/'
-        
+
     if outfile == None:
         outfile = 'superbias_from_integration'+str(integration)+'_of_'+listfile+'_fromGroups'+str(groupstart)+'to'+str(groupend)+'.fits'
         if ((ipc == True) & (xtalk == True)):
-            outfile = 'superbias_withIPCXTALK_from_integration'+str(integration)+'_of_'+listfile+'_fromGroups'+str(groupstart)+'to'+str(groupend)+'.fits' 
+            outfile = 'superbias_withIPCXTALK_from_integration'+str(integration)+'_of_'+listfile+'_fromGroups'+str(groupstart)+'to'+str(groupend)+'.fits'
         if ((ipc == True) & (xtalk == False)):
-            outfile = 'superbias_withIPC_from_integration'+str(integration)+'_of_'+listfile+'_fromGroups'+str(groupstart)+'to'+str(groupend)+'.fits' 
+            outfile = 'superbias_withIPC_from_integration'+str(integration)+'_of_'+listfile+'_fromGroups'+str(groupstart)+'to'+str(groupend)+'.fits'
         if ((ipc == False) & (xtalk == True)):
-            outfile = 'superbias_withXTALK_from_integration'+str(integration)+'_of_'+listfile+'_fromGroups'+str(groupstart)+'to'+str(groupend)+'.fits' 
+            outfile = 'superbias_withXTALK_from_integration'+str(integration)+'_of_'+listfile+'_fromGroups'+str(groupstart)+'to'+str(groupend)+'.fits'
 
     #if outfile already exists, move it to 'prev_'+outfile.
     #if os.path.isfile(outfile):
@@ -1219,7 +1217,7 @@ def create_superbias(tup):
 
     #redcat team checks
     subprocess.call(['fitsverify',outdir+outfile])
-            
+
 
 def save_superbias(bias,err,dq,dqdef,files,outdir,outfile):
     #from jwst_lib.models import SuperBiasModel
@@ -1255,7 +1253,7 @@ def save_superbias(bias,err,dq,dqdef,files,outdir,outfile):
 
     #look for the fastaxis and slowaxis keywords in the input data.
     #if they are present propogate those values into the bad pixel
-    #mask. If they are not present, then you must be working with 
+    #mask. If they are not present, then you must be working with
     #native orientation data, so use the appropriate values
     inhdu = fits.open(files[0])
     try:
@@ -1287,7 +1285,7 @@ def save_superbias(bias,err,dq,dqdef,files,outdir,outfile):
     sbmodel.history.append('SOFTWARE:')
     sbmodel.history.append('/ifs/jwst/wit/witserv/data4/nrc/')
     sbmodel.history.append('hilbert/superbias/cv3/B1/superbias_create_ngroups.py')
-        
+
     #put the list of input files into the HISTORY keyword
     sbmodel.history.append('DATA USED:')
     for file in files:
@@ -1298,7 +1296,7 @@ def save_superbias(bias,err,dq,dqdef,files,outdir,outfile):
                 sbmodel.history.append(file[val:val+60])
             else:
                 sbmodel.history.append(file[val:])
-        
+
     sbmodel.history.append('DIFFERENCES:')
     sbmodel.history.append('N/A. No previous version.')
 
@@ -1325,12 +1323,12 @@ def add_options(parser=None,usage=None):
     parser.add_argument("--ipc",help="Perform IPC correction on the input data. Default = False.",action = 'store_true', default=False)
     parser.add_argument("--xtalk",help="Perform cross-talk correction on the input data. Default=False",action='store_true',default=False)
     return parser
-        
+
 
 if __name__ == '__main__':
-        
+
     usagestring = 'USAGE: superbias.py files_to_use.list'
-    
+
     #superbias = Superbias()
     parser = add_options(usage=usagestring)
     args = parser.parse_args()
@@ -1364,9 +1362,8 @@ if __name__ == '__main__':
         verb.write('Output directory : {}\n'.format(outdir))
         verb.write('Output file: {}\n'.format(outfile))
         verb.write('Skip NN2: {}\n'.format(skipnn2))
-        
+
 
     #output = create_superbias(args.listfile,boxsize=args.boxwidth,width=args.applybox,edge_truncate=args.fulledge,saveplots=args.saveplots,showplots=args.showplots,outfile=args.outfile)
 
     output = create_superbias((args.listfile,args.boxwidth,args.applybox,args.showplots,args.saveplots,args.outdir,args.outfile,args.fulledge,args.skipnn2,args.groupstart,args.groupend,args.integration,args.ipc,args.xtalk))
-
