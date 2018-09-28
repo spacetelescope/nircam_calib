@@ -86,7 +86,7 @@ def calculate_means(data,boxwidth,edge_truncate=True):
 
 
 def correct_1overf(data,filename,boxwidth,appwidth):
-    import nn2
+    from . import nn2
     from numpy import zeros,zeros_like,sqrt
 
     print('Beginning 1/f correction, using NN2 method.')
@@ -228,7 +228,7 @@ def correct_1overf(data,filename,boxwidth,appwidth):
 
                 #save the NN2 output vector and uncertainty vector for each pixel. We also
                 #need the mean vector, for later subtraction
-                for xpt in range(int(qstart[amp]+targx[box]-(appwidth/2)),int(qstart[amp]+targx[box]+(appwidth/2))):
+                for xpt in range(qstart[amp]+targx[box]-int(appwidth/2),qstart[amp]+targx[box]+int(appwidth/2)):
                     #print('qstart[amp] ',qstart[amp],'targx[box] ',targx[box],'appwidth/2 ',appwidth/2,'appwidth/2 ',appwidth/2)
                     if xpt >= (qstart[amp]) and xpt < (qstart[amp+1]):
                         #print('box ',box,'xpt ',xpt)
@@ -908,7 +908,7 @@ def pixels_with_signal(biasramp,biasramperr,biasframe,biasframeerr,detector,tgro
         sigpix = np.where((biasframe_amp >= (pixclass.mean+nsig*pixclass.stdev)) | (biasframe_amp <= (pixclass.mean-nsig*pixclass.stdev)))
         perc = float_formatter(len(sigpix[0])/(510.*2040.)*100.)
         print(("Amp {}: {} pixels ({}% of total pixels) have appreciable signal and will be line-fit.".format(amp+1,len(sigpix[0]),perc)))
-
+         
         #loop over pixels with signal so that we can line-fit
         for i in range(len(sigpix[0])):
         #for i in xrange(3):

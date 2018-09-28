@@ -22,7 +22,7 @@ def run(listfile,outfile,origfilelist,overwrite=True):
         if overwrite == True:
             os.remove(outfile)
         else:
-            print("WARNING: {} exists and overwrite is set to False. Quitting.".format(outfile))
+            print(("WARNING: {} exists and overwrite is set to False. Quitting.".format(outfile)))
             sys.exit()
 
     #if origfilelist is not provided, use listfile
@@ -35,7 +35,7 @@ def run(listfile,outfile,origfilelist,overwrite=True):
         for line in f:
             files.append(line.strip())
 
-    print("Files to use:",files)
+    print(("Files to use:",files))
 
     #read in individual superbiases
     superbiasdqdef = []
@@ -213,12 +213,12 @@ def calc_avg_superbias(biases,errs):
     superbias = np.zeros((ny,nx))
     supererrs = np.zeros((ny,nx))
     superdq = np.zeros((ny,nx))
-    for y in xrange(ny):
-        for x in xrange(nx):
+    for y in range(ny):
+        for x in range(nx):
     #for y in xrange(500,505):
     #    for x in xrange(500,505):
             if ((x==0) & (y % 100 == 0)):
-                print('Working on row {}'.format(y))
+                print(('Working on row {}'.format(y)))
             mm,dd = sigmacut_meandev(biases[:,y,x])
             superbias[y,x] = mm
 
@@ -264,8 +264,8 @@ def create_dq_array(biases):
     superbias = np.zeros((yd,xd))
     uncertainty = np.zeros((yd,xd))
     badmap = np.zeros((yd,xd))
-    for y in xrange(yd):
-        for x in xrange(xd):
+    for y in range(yd):
+        for x in range(xd):
             mn,dev = sigmacut_meandev(biases[:,y,x])
             superbias[y,x] = mn
             uncertainty[y,x] = dev
