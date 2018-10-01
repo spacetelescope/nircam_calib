@@ -21,7 +21,7 @@ def test_superbias_subtraction():
     ncols = 2048
     blevel = 2000.
 
-    data, bias, ngroups = setup_cube(ngroups, nrows, ncols)
+    data, bias = setup_cube(ngroups, nrows, ncols)
     data.data[:] = blevel
     bias.data[:] = blevel
     output = do_correction(data, bias)
@@ -37,7 +37,7 @@ def test_subarray_correction():
     ncols = 500
     blevel = 2000.
 
-    data, bias, ngroups = setup_cube(ngroups, nrows, ncols)
+    data, bias = setup_cube(ngroups, nrows, ncols)
     data.data[:] = blevel
     bias.data[:] = blevel
     output = do_correction(data, bias)
@@ -54,7 +54,7 @@ def test_dq_propagation():
     dqval1 = 5
     dqval2 = 10
 
-    data, bias, ngroups = setup_cube(ngroups, nrows, ncols)
+    data, bias = setup_cube(ngroups, nrows, ncols)
     data.pixeldq[5, 5] = dqval1
     bias.dq[5, 5] = dqval2
     output = do_correction(data, bias)
@@ -91,4 +91,4 @@ def setup_cube(ngroups, nrows, ncols):
     bias_model.meta.pedigree = 'Dummy'
     bias_model.meta.useafter = '2015-10-01T00:00:00'
 
-    return data_model, bias_model, ngroups
+    return data_model, bias_model

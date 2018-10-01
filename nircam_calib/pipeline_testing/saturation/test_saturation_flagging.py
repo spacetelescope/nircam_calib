@@ -19,7 +19,7 @@ def test_basic_saturation_flagging():
     ncols = 2048
     satvalue = 60000
 
-    data, satmap, ngroups = setup_cube(ngroups, nrows, ncols)
+    data, satmap = setup_cube(ngroups, nrows, ncols)
     data.data[0,0,500,500] = 0
     data.data[0,1,500,500] = 20000
     data.data[0,2,500,500] = 40000
@@ -39,7 +39,7 @@ def test_signal_fluctuation_flagging():
     ncols = 2048
     satvalue = 60000
 
-    data, satmap, ngroups = setup_cube(ngroups, nrows, ncols)
+    data, satmap = setup_cube(ngroups, nrows, ncols)
     data.data[0,0,500,500] = 0
     data.data[0,1,500,500] = 20000
     data.data[0,2,500,500] = 40000
@@ -59,7 +59,7 @@ def test_first_group_saturation():
     ncols = 2048
     satvalue = 60000
 
-    data, satmap, ngroups = setup_cube(ngroups, nrows, ncols)
+    data, satmap = setup_cube(ngroups, nrows, ncols)
     data.data[0,0,500,500] = 60000
     data.data[0,1,500,500] = 70000
     data.data[0,2,500,500] = 70000
@@ -79,7 +79,7 @@ def test_subarray_flagging():
     ncols = 200
     satvalue = 60000
 
-    data, satmap, ngroups = setup_cube(ngroups, nrows, ncols)
+    data, satmap = setup_cube(ngroups, nrows, ncols)
     print(data.data.shape,satmap.data.shape)
     data.data[0,0,150,150] = 0
     data.data[0,1,150,150] = 20000
@@ -101,7 +101,7 @@ def test_dq_propagation():
     dqval1 = 5
     dqval2 = 10
 
-    data, satmap, ngroups = setup_cube(ngroups, nrows, ncols)
+    data, satmap = setup_cube(ngroups, nrows, ncols)
     data.pixeldq[5, 5] = dqval1
     satmap.dq[5, 5] = dqval2
     output = do_correction(data, satmap)
@@ -116,7 +116,7 @@ def test_no_sat_check():
     ncols = 2048
     satvalue = 60000
 
-    data, satmap, ngroups = setup_cube(ngroups, nrows, ncols)
+    data, satmap = setup_cube(ngroups, nrows, ncols)
     satmap.dq[500,500] = dqflags.pixel['NO_SAT_CHECK']
     data.data[0,0,500,500] = 0
     data.data[0,1,500,500] = 20000
@@ -136,7 +136,7 @@ def test_nans_in_mask():
     ncols = 2048
     satvalue = np.nan
 
-    data, satmap, ngroups = setup_cube(ngroups, nrows, ncols)
+    data, satmap = setup_cube(ngroups, nrows, ncols)
     satmap.dq[500,500] = dqflags.pixel['NO_SAT_CHECK']
     data.data[0,0,500,500] = 0
     data.data[0,1,500,500] = 20000
@@ -180,4 +180,4 @@ def setup_cube(ngroups, nrows, ncols):
     saturation_model.meta.pedigree = 'Dummy'
     saturation_model.meta.useafter = '2015-10-01T00:00:00'
 
-    return data_model, saturation_model, ngroups
+    return data_model, saturation_model
