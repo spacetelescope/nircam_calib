@@ -11870,27 +11870,35 @@ div#notebook {
 <p>If you also want to be able to run the JWST Science Calibration pipeline within the simulator or on your simulated data, you can use Conda to set up your pipeline environment.</p>
 <p>To read more on JWST Science Calibration Pipeline installation, see these links:</p>
 <blockquote><ol>
-<li>JDox: <a href="https://jwst-docs.stsci.edu/display/JDAT/JWST+Data+Reduction+Pipeline">https://jwst-docs.stsci.edu/display/JDAT/JWST+Data+Reduction+Pipeline</a></li>
-<li>Installation page: <a href="http://astroconda.readthedocs.io/en/latest/releases.html#pipeline-install">http://astroconda.readthedocs.io/en/latest/releases.html#pipeline-install</a></li>
+<li>Installation page and code repository: <a href="https://github.com/spacetelescope/jwst/blob/master/README.md">https://github.com/spacetelescope/jwst/blob/master/README.md</a></li>
 <li>Detailed pipeline information: <a href="https://jwst-pipeline.readthedocs.io/en/latest/jwst/introduction.html">https://jwst-pipeline.readthedocs.io/en/latest/jwst/introduction.html</a></li>
 <li>Help Desk (click on Pipeline Support): <a href="https://stsci.service-now.com/jwst?id=sc_category&amp;sys_id=e15706fc0a0a0aa7007fc21e1ab70c2f">https://stsci.service-now.com/jwst?id=sc_category&amp;sys_id=e15706fc0a0a0aa7007fc21e1ab70c2f</a></li>
 </ol>
 </blockquote>
-<p>Pipeline release files are snapshots of STScI software and can be used to replicate the environment used by STScI to perform data processing. Upgrading packages with <code>$ conda update [pkg]</code> or <code>$ conda update --all</code> is <strong>not</strong> recommended (it will likely introduce bugs and/or break the environment).</p>
+<p>Pipeline release files are snapshots of STScI software and can be used to replicate the environment used by STScI to perform data processing.</p>
 <p><div class="alert alert-block alert-warning">**Note:** Python 2.x.x and 32-bit operating systems are not supported.</div></p>
 <hr>
-<p>Pipeline release installations use the following command:</p>
+<p>To install a particular released version of the package and all its dependencies, you should use the spec file that lists the exact versions of all packages to be installed. Create a new environment for the pipeline using:</p>
 <blockquote><p><code>$ conda create -n [custom_env_name] --file [URL]</code></p>
 </blockquote>
-<p>Select the URL that matches your platform and environment (see this link: <a href="http://astroconda.readthedocs.io/en/latest/releases.html#file-urls">http://astroconda.readthedocs.io/en/latest/releases.html#file-urls</a>).</p>
-<p>Activate the pipeline environment with the command:</p>
+<p>where [custom_env_name] is the name you choose for the environment and [URL] is of the form:</p>
+<blockquote><p><code>Linux: http://ssb.stsci.edu/releases/jwstdp/0.11.0/latest-linux</code></p>
+<p><code>OS X: http://ssb.stsci.edu/releases/jwstdp/0.11.0/latest-osx</code></p>
+</blockquote>
+<p>Other versions can be installed by choosing a different version tag in place of "0.11.0" in the URL path. See the "Software vs DMS build version map" table <a href="https://github.com/spacetelescope/jwst/blob/master/README.md">on this page</a> for a list of tags corresponding to particular releases.</p>
+<p>Finally, to activate your pipeline environment type:</p>
 <blockquote><p><code>$ source activate [custom_env_name]</code></p>
 </blockquote>
 <p>Example for Mac OS X:</p>
-<blockquote><p><code>$ conda create -n demoenv --file http://ssb.stsci.edu/releases/hstdp/2017.2a/hstdp-2017.2a-osx-py35.final.txt</code></p>
-<p><code>$ source activate demoenv</code></p>
+<blockquote><p><code>$ conda create -n demoenv0.11.0 --file http://ssb.stsci.edu/releases/jwstdp/0.11.0/latest-linux</code></p>
+<p><code>$ source activate demoenv0.11.0</code></p>
 </blockquote>
 <p>To run the pipeline in this notebook, you must open the notebook from within your pipeline environment. "shift+enter" is the hot key to run a cell of the notebook.</p>
+<p>To update to the latest nightly build:</p>
+<blockquote><p><code>$ conda update -n &lt;jwst_name&gt; --override-channels -c http://ssb.stsci.edu/astroconda-dev -c defaults --all</code></p>
+</blockquote>
+<p><div class="alert alert-block alert-warning">**Note:** Upgrading packages with `$ conda update [pkg]` or `$ conda update --all` is **not** recommended (it will likely introduce bugs and/or break the environment).</div></p>
+<hr>
 
 </div>
 </div>

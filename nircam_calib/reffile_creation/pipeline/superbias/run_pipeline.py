@@ -10,7 +10,7 @@ from jwst.pipeline import SloperPipeline
 from multiprocessing import Pool
 from astropy.table import Table
 import argparse
-from itertools import izip
+
 from datetime import datetime
 from astropy.io import fits
 from jwst.flatfield import FlatFieldStep
