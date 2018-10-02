@@ -7,7 +7,7 @@ Unit tests for saturation flagging
 import pytest
 import numpy as np
 
-from jwst.saturation.saturation import do_correction
+from jwst.saturation.saturation import do_correction, correct_for_NaN
 from jwst.datamodels import RampModel, SaturationModel, dqflags
 
 
@@ -134,18 +134,13 @@ def test_nans_in_mask():
     ngroups = 5
     nrows = 2048
     ncols = 2048
-    satvalue = np.nan
+    HUGE_NUM = 100000.
 
     data, satmap = setup_cube(ngroups, nrows, ncols)
-    satmap.dq[500,500] = dqflags.pixel['NO_SAT_CHECK']
-    data.data[0,0,500,500] = 0
-    data.data[0,1,500,500] = 20000
-    data.data[0,2,500,500] = 40000
-    data.data[0,3,500,500] = 60000
-    data.data[0,4,500,500] = 80000
-    output = do_correction(data, satmap)
-    assert np.all(output.groupdq[0,:,500,500] != dqflags.group['SATURATED'])
-    assert output.pixeldq[500,500] == dqflags.pixel['NO_SAT_CHECK']
+    satmap.data[500,500] = np.nan
+    correct_for_NaN(satmap.data, satmap.dq)
+    assert satmap.data[500,500] == HUGE_NUM
+    assert satmap.dq[500,500] == dqflags.pixel['NO_SAT_CHECK']
 
 
 @pytest.fixture(scope='function')
