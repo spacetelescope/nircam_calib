@@ -117,19 +117,19 @@ def extract_from_engdb(old_hdulist, new_hdulist, url_base, config):
     # Get the exposure start and end times
     start_time = Time(old_hdulist[0].header['EXPSTART'], format='mjd').isot
     end_time = Time(old_hdulist[0].header['EXPEND'], format='mjd').isot
-    params = {'sTime' : start_time, 'eTime' : end_time}
+    params = {'sTime':start_time, 'eTime':end_time}
 
     # Start HTTP request session
-    s = requests.Session()
+    session = requests.Session()
 
     for keyword, mnemonic in config['mnemonics'].items():
 
         # Get request to server.
         url = url_base + mnemonic
-        r = s.get(url, params=params, verify=False)
+        req = session.get(url, params=params, verify=False)
 
         # Parse json
-        parsed_json = r.json()
+        parsed_json = req.json()
 
         # json ObsTime has format '/Date(1358619814230+0000)/' which is 1358619814.230 in UNIX time
         # isotime = Time(float(parsed_json['Data'][0]['ObsTime'][6:-7])/1000., format='unix').isot
@@ -140,7 +140,6 @@ def extract_from_engdb(old_hdulist, new_hdulist, url_base, config):
         new_hdulist[0].header[keyword] = (parsed_json['TlmMnemonics'][0]['EUType'], mnemonic.upper())
 
     # Add the Engineering Mnemonics section heading
-    *_, last = old_hdulist[0].header
     new_hdulist[0].header.set('', '', before=list(config['mnemonics'].keys())[0])
     new_hdulist[0].header.set('', 'Engineering Mnemonics', before=list(config['mnemonics'].keys())[0])
     new_hdulist[0].header.set('', '', before=list(config['mnemonics'].keys())[0])
@@ -148,7 +147,7 @@ def extract_from_engdb(old_hdulist, new_hdulist, url_base, config):
     return new_hdulist
 
 
-def add_missing_headers(old_hdulist, new_hdulist, config):
+def add_missing_headers(new_hdulist, config):
     """Add missing keywords for FITSwriter data (e.g., COLCORNR or COLSTART)
 
     Parameters
@@ -177,7 +176,6 @@ def add_missing_headers(old_hdulist, new_hdulist, config):
             new_hdulist[0].header[keyword] = header
 
     # Add the Added Headers section heading
-    *_, last = old_hdulist[0].header
     new_hdulist[0].header.set('', '', before=list(config['headers'].keys())[0])
     new_hdulist[0].header.set('', 'Added Headers', before=list(config['headers'].keys())[0])
     new_hdulist[0].header.set('', '', before=list(config['headers'].keys())[0])
@@ -200,16 +198,12 @@ def main(args):
     # JWST ENGINEERING DATABASE
     # If there are mnemonics headers to add, then add them
     if 'mnemonics' in config:
+        print('Adding mnemonics headers.')
 
         # Create a new HDUList for the output file and add the old headers
         new_hdulist = fits.HDUList()
         new_hdulist.append(fits.PrimaryHDU())
         new_hdulist[0].header = old_hdulist[0].header
-
-        # Get the exposure start and end times
-        start_time = Time(old_hdulist[0].header['EXPSTART'], format='mjd').isot
-        end_time = Time(old_hdulist[0].header['EXPEND'], format='mjd').isot
-        params = {'sTime' : start_time, 'eTime' : end_time}
 
         # Link to the JWST Engineering Database
         eng_db_url = 'http://iwjwdmsbemweb.stsci.edu/JWDMSEngSpAccB71/TlmMnemonicDataSrv.svc/MetaData/TlmMnemonics/'
@@ -220,25 +214,26 @@ def main(args):
     # NEW HEADERS
     # If there are new headers to add, then add them
     if 'headers' in config:
-        new_hdulist = add_missing_headers(old_hdulist, new_hdulist, config)
+        print('Adding other headers.')
+        new_hdulist = add_missing_headers(new_hdulist, config)
 
     # Transform data from DMS to detector orientation
     pixel_data = dms_to_detector(old_hdulist['SCI'].data, old_hdulist['PRIMARY'].header['DETECTOR'])
 
     # Collapse data shape from 4D to 3D
-    nints, ngroups, nx, ny = pixel_data.shape
+    nints, ngroups, nxpix, nypix = pixel_data.shape
 
     # Add reference output for MIRI if necessary
     if old_hdulist['PRIMARY'].header['INSTRUME'] == 'MIRI':
-        new_hdulist[0].data = np.append(old_hdulist['SCI'].data.reshape((nints*ngroups, nx, ny)),
+        new_hdulist[0].data = np.append(old_hdulist['SCI'].data.reshape((nints*ngroups, nxpix, nypix)),
             old_hdulist['REFOUT'].data.reshape((nints*ngroups, 256, 1032)), axis=1)
     else:
-        new_hdulist[0].data = pixel_data.reshape((nints*ngroups, nx, ny))
+        new_hdulist[0].data = pixel_data.reshape((nints*ngroups, nxpix, nypix))
 
     # Remove the NEXTEND keyword since there is only one extension now
-    try:
+    if 'NEXTEND' in new_hdulist[0].header:
         new_hdulist[0].header.remove('NEXTEND')
-    except:
+    else:
         print('No NEXTEND header, skipping.')
 
     # Write out the reformatted file
