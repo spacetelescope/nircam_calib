@@ -62,18 +62,6 @@ import numpy as np
 from ncdhas_dict import *
 
 
-def test_environment_variable():
-    '''Ensure the NCDHAS environment variables have been set.
-
-    '''
-
-    if environ.get('NCDHAS_PATH') is not None:
-        print('Error! Need to set the following environment variables:')
-        print('export NCDHAS_PATH=/grp/software/Linux/RH6/x86_64/ncdhas')
-        print('export PATH=$PATH:$NCDHAS_PATH')
-        sys.exit(0)
-
-
 def terminal_cmd(calibstep, filebase, outdir):
     """Builds NCDHAS pipeline terminal command.
 
