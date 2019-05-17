@@ -272,8 +272,14 @@ def main(args):
     # Do a search for the keyword of interest
     kd_search = recursive_keyword_search(kwd_dict, args.kwd)
 
-    # Grab the information from the dictionary
-    get_keyword_info(kwd_dict, kd_search, args.kwd, args.attrib, args.inst)
+    # Throw an error and exit if keyword not found
+    if not kd_search:
+        print('\nERROR! Keyword not found in any schemas. Exiting.\n')
+        sys.exit(0)
+
+    elif kd_search:
+        # Grab the information from the dictionary
+        get_keyword_info(kwd_dict, kd_search, args.kwd, args.attrib, args.inst)
 
 
 if __name__ == '__main__':
