@@ -177,7 +177,7 @@ def get_keyword_info(kwd_dict, kd_search, keyword, attrib, inst):
         log = None
 
     for result in kd_search:
-        if inst is not 'ALL':
+        if inst not in ['all', 'ALL']:
             # save out keyword information according to arguments
             if inst in result[-1]:
                 schema = result[-1]
