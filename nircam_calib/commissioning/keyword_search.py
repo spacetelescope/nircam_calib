@@ -35,6 +35,10 @@ Use:
 
     python keyword_search.py keyword --noverb --save
 
+6. To search for the source of all keywords:
+
+    python keyword_search.py none --full
+
 """
 
 # Required packages
@@ -42,7 +46,10 @@ import sys
 import argparse
 import pprint
 from time import time
+import pandas as pd
 from astroquery.mast import Mast
+from astropy.table import Table
+from astropy.io import ascii
 
 
 def mast_request(version):
@@ -143,6 +150,58 @@ def recursive_keyword_search(kwd_dict, keyword):
             pass
 
     return results
+
+
+def full_keyword_search(kwd_dict):
+    """Do recursive search for the source of all keywords.
+
+    Parameters
+    ----------
+    kwd_dict : json object
+        Keyword dictionary as a JSON nested dictionary object
+
+    Returns
+    -------
+    results : table
+        Table containing source of all keywords
+    """
+
+    # check that input is a dictionary
+    if not isinstance(kwd_dict, dict):
+        return False
+
+    # initialize the table for storing the outputs
+    full_table = pd.DataFrame()
+
+    # recursively check the dictionary
+    for k, v in kwd_dict.items():
+
+        # search the schemas for fits_keyword attributes
+        if hasattr(v, 'items'):
+
+            # check all the schemas for a keyword
+            for j, l in kwd_dict[k].items():
+                try:
+                    tmp_table = pd.DataFrame()
+                    tmp_table['KEYWORD'] = [l['fits_keyword']]
+                    tmp_table['SOURCE'] = [l['source']]
+                    full_table = pd.concat([full_table, tmp_table])
+                except:
+                    # skip items that aren't relevant
+                    pass
+        else:
+            # skip items that aren't relevant
+            pass
+
+    # remove duplicate lines
+    full_table = full_table.drop_duplicates()
+    # full_table.sort_values('SOURCE', ascending=True)
+
+    # convert table format for easy saving
+    ast_table = Table.from_pandas(full_table)
+    ast_table.sort('SOURCE')
+
+    return ast_table
 
 
 def get_keyword_info(kwd_dict, kd_search, keyword, attrib, inst):
@@ -271,20 +330,39 @@ def main(args):
     # Access the JWST Keyword Dictionary
     kwd_dict = mast_request(args.kd_version)
 
-    # Do a search for the keyword of interest
-    kwd = str(args.kwd).upper()
-    kd_search = recursive_keyword_search(kwd_dict, kwd)
+    # Check to see if this is a search of all keywords
+    if args.full is True:
+        if args.kwd in ['none', 'NONE']:
+            table = full_keyword_search(kwd_dict)
 
-    # Throw an error and exit if keyword not found
-    if not kd_search:
-        print('\nERROR! Keyword not found in any schemas. Exiting.\n')
-        sys.exit(0)
+            # write file
+            ascii.write(table, 'kwd_sources.dat', format='fixed_width_two_line')
+            # ascii.write(table, 'kwd_sources.csv', format='csv')
+            print('Saving table: kwd_sources.dat')
 
-    elif kd_search:
-        # Grab the information from the dictionary
-        attrib = str(args.attrib).lower()
-        inst = str(args.inst).lower()
-        get_keyword_info(kwd_dict, kd_search, kwd, attrib, inst)
+        else:
+            print('Error! Use kwd=None for full source search!')
+            sys.exit(0)
+
+    else:
+        if args.kwd in ['none', 'NONE']:
+            print('Error! Need keyword to search on!')
+            sys.exit(0)
+        else:
+            # Do a search for the keyword of interest
+            kwd = str(args.kwd).upper()
+            kd_search = recursive_keyword_search(kwd_dict, kwd)
+
+            # Throw an error and exit if keyword not found
+            if not kd_search:
+                print('\nERROR! Keyword not found in any schemas. Exiting.\n')
+                sys.exit(0)
+
+            elif kd_search:
+                # Grab the information from the dictionary
+                attrib = str(args.attrib).lower()
+                inst = str(args.inst).lower()
+                get_keyword_info(kwd_dict, kd_search, kwd, attrib, inst)
 
 
 if __name__ == '__main__':
@@ -295,6 +373,8 @@ if __name__ == '__main__':
 
     parser.add_argument('kwd',
                         help='keyword to search for in the dictionary.')
+    parser.add_argument('--full', action='store_true',
+                        help='search source for all keywords')
     parser.add_argument('--attrib', default="ALL",
                         help='attribute of interest (e.g., source)')
     parser.add_argument('--inst', default="ALL",
