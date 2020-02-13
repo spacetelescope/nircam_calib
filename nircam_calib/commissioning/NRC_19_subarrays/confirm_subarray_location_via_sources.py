@@ -102,7 +102,7 @@ import yaml
 from mirage.utils import siaf_interface
 
 from nircam_calib.commissioning.utils.astrometry import RADec_To_XY, XY_To_RADec
-from nircam_calib.commissioning.utils.photometry import find_sources
+from nircam_calib.commissioning.utils.photometry import find_sources, fwhm, get_fwhm
 
 
 def run(full_frame_file, subarray_files, output_dir='./'):
@@ -133,9 +133,13 @@ def run(full_frame_file, subarray_files, output_dir='./'):
     if 'LONG' in ff_det:
         ff_det = ff_det.replace('LONG', '5')
     ff_aperture = '{}_{}'.format(ff_det, ff_ap_name)
+    ff_filter = ff_header['FILTER']
+
+    # Calculate the FWHM in pixels to input to the source finder
+    ff_fwhm = get_fwhm(ff_filter)
 
     ffbasename = os.path.basename(full_frame_file)
-    full_frame_sources = find_sources(full_frame, threshold=500, plot_name='{}_full_frame_source_map.png'.format(ffbasename))
+    full_frame_sources = find_sources(full_frame, threshold=500, fwhm=ff_fwhm, plot_name='{}_full_frame_source_map.png'.format(ffbasename))
     ascii.write(full_frame_sources, '{}_ff_sources.txt'.format(ffbasename), overwrite=True)
 
     # Read in full frame file's WCS
@@ -151,12 +155,14 @@ def run(full_frame_file, subarray_files, output_dir='./'):
 
     # Read in subarray data and locate sources
     for subfile in subarray_files:
-        subarray, start_coords, end_coords, det, ap_name = get_data(subfile)
+        subarray, start_coords, end_coords, det, ap_name, filt = get_data(subfile)
         if 'LONG' in det:
             det = det.replace('LONG', '5')
         aperture = '{}_{}'.format(det, ap_name)
 
-        subarray_sources = find_sources(subarray, threshold=500, plot_name='{}_source_map.png'.format(os.path.basename(subfile)))
+        # Calculate the FWHM in pixels to input to the source finder
+        sub_fwhm = get_fwhm(filt)
+        subarray_sources = find_sources(subarray, threshold=500, fwhm=sub_fwhm, plot_name='{}_source_map.png'.format(os.path.basename(subfile)))
 
         filebase = os.path.join('yaml_files', os.path.basename(subfile))
         yaml_file = filebase.replace('_rate.fits', '.yaml')
@@ -257,7 +263,8 @@ def get_data(filename):
 
     detector = header['DETECTOR']
     aperture = header['SUBARRAY']
+    filter_name = header['FILTER']
 
     substrt = (header['SUBSTRT1'] - 1, header['SUBSTRT2'] - 1)
     subend = (substrt[0] + xlen, substrt[1] + ylen)
-    return data, substrt, subend, detector, aperture
+    return data, substrt, subend, detector, aperture, filter_name

@@ -11,7 +11,7 @@ import numpy as np
 from photutils import CircularAperture, DAOStarFinder
 
 
-def find_sources(data, threshold=30, show_sources=True, plot_name='sources.png'):
+def find_sources(data, threshold=30, fwhm=3.0, show_sources=True, plot_name='sources.png'):
     """Use photutils' DAOFind to locate sources in the input image.
 
     Parameters
@@ -35,7 +35,7 @@ def find_sources(data, threshold=30, show_sources=True, plot_name='sources.png')
         Table of source positions
     """
     mean, median, std = sigma_clipped_stats(data, sigma=3.0)
-    daofind = DAOStarFinder(fwhm=3.0, threshold=threshold*std, peakmax=12000.)
+    daofind = DAOStarFinder(fwhm=fwhm, threshold=threshold*std, peakmax=12000.)
     sources = daofind(data - median)
 
     if show_sources:
@@ -47,3 +47,48 @@ def find_sources(data, threshold=30, show_sources=True, plot_name='sources.png')
         plt.savefig(plot_name)
 
     return sources
+
+
+def fwhm(wavelength):
+    """Calculate the approximate FWHM, in arcsec, for a given wavelength.
+    This equation was calculated by hand using approximate values for the
+    FWHM found on JDox:
+    https://jwst-docs.stsci.edu/near-infrared-camera/nircam-predicted-performance/nircam-point-spread-functions#NIRCamPointSpreadFunctions-PSFFWHM
+
+    Parameters
+    ----------
+    wavelength : float
+        Wavelength, in microns
+
+    Returns
+    -------
+    fwhm : float
+        FWHM of the PSF, in units of arcsec
+    """
+    return 0.03 * wavelength + 0.004
+
+
+def get_fwhm(filter_name):
+    """Calculate the FWHM in units of pixels given a filter name
+
+    Parameters
+    ----------
+    filter_name : str
+        e.g. F200W
+
+    Returns
+    -------
+    FWHM of the PSF, in units of pixels
+    """
+    filter_name = filter_name.upper()
+    try:
+        wave = float(filter_name[1:4]) / 100.
+    except ValueError:
+        raise ValueError("ERROR: Cannot get a wavelength from the filter name: {}".format(filter_name))
+
+    fwhm_arcsec = fwhm(wave)
+    if wave < 2.4:
+        pix_scale = 0.031  # arcsec/pixel
+    else:
+        pix_scale = 0.062  # arcsec/pixel
+    return fwhm_arcsec / pix_scale
