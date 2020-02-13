@@ -93,18 +93,26 @@ Tar Tile Exp Dith Aperture Name             Target       RA         Dec        B
 
 
 """
-from astropy.stats import sigma_clipped_stats
-from photutils import DAOStarFinder
+from astropy.io import ascii, fits
 import numpy as np
-import matplotlib.pyplot as plt
-from astropy.visualization import SqrtStretch
-from astropy.visualization.mpl_normalize import ImageNormalize
-from photutils import CircularAperture
+import os
 import pysiaf
+import yaml
+
+from mirage.utils import siaf_interface
+
+from nircam_calib.commissioning.utils.astrometry import RADec_To_XY, XY_To_RADec
+from nircam_calib.commissioning.utils.photometry import find_sources
 
 
-def run():
+def run(full_frame_file, subarray_files, output_dir='./'):
     """MAIN FUNCTION
+
+    Paramters
+    ---------
+    full_frame_file : str
+
+    subarray_files : list
     """
     # Determine which full frame image to compare with which subarray images
     # Detect sources in full-frame image
@@ -115,133 +123,141 @@ def run():
     # For subarrays not centered on the detector (sub64p/sub400p), this will fail because the reference locations are different!!!
         # In that case, you'll have to use knowledge of the refrence locations to predict source locations
     # Compare
+    siaf_instance = pysiaf.Siaf('nircam')
+
+    # Read in full frame data and locate sources
+    full_frame = fits.getdata(full_frame_file)
+    ff_header = fits.getheader(full_frame_file)
+    ff_det = ff_header['DETECTOR']
+    ff_ap_name = ff_header['SUBARRAY']
+    if 'LONG' in ff_det:
+        ff_det = ff_det.replace('LONG', '5')
+    ff_aperture = '{}_{}'.format(ff_det, ff_ap_name)
+
+    ffbasename = os.path.basename(full_frame_file)
+    full_frame_sources = find_sources(full_frame, threshold=500, plot_name='{}_full_frame_source_map.png'.format(ffbasename))
+    ascii.write(full_frame_sources, '{}_ff_sources.txt'.format(ffbasename), overwrite=True)
+
+    # Read in full frame file's WCS
+    ff_filebase = os.path.join('yaml_files', os.path.basename(full_frame_file))
+    ff_yaml_file = ff_filebase.replace('_rate.fits', '.yaml')
+    ff_params = read_yaml_file(ff_yaml_file)
+
+    ff_local_roll, ff_attitude_matrix, ff_ffsize, ff_subarray_bounds = siaf_interface.get_siaf_information(siaf_instance, ff_aperture,
+                                                                                                   ff_params['Telescope']['ra'],
+                                                                                                   ff_params['Telescope']['dec'],
+                                                                                                   ff_params['Telescope']['rotation'], v2_arcsec=None,
+                                                                                                   v3_arcsec=None, verbose=False)
+
+    # Read in subarray data and locate sources
+    for subfile in subarray_files:
+        subarray, start_coords, end_coords, det, ap_name = get_data(subfile)
+        if 'LONG' in det:
+            det = det.replace('LONG', '5')
+        aperture = '{}_{}'.format(det, ap_name)
+
+        subarray_sources = find_sources(subarray, threshold=500, plot_name='{}_source_map.png'.format(os.path.basename(subfile)))
+
+        filebase = os.path.join('yaml_files', os.path.basename(subfile))
+        yaml_file = filebase.replace('_rate.fits', '.yaml')
+        params = read_yaml_file(yaml_file)
+
+        local_roll, attitude_matrix, ffsize, subarray_bounds = siaf_interface.get_siaf_information(siaf_instance, aperture,
+                                                                                                   params['Telescope']['ra'],
+                                                                                                   params['Telescope']['dec'],
+                                                                                                   params['Telescope']['rotation'], v2_arcsec=None,
+                                                                                                   v3_arcsec=None, verbose=False)
+        # Add RA, Dec for each source in subarray image
+        ra_vals = []
+        dec_vals = []
+        ff_equiv_x = []
+        ff_equiv_y = []
+
+        # Add an empty column to the table listing the distance to the nearest
+        # full frame source
+        subarray_sources['delta_ff'] = np.zeros(len(subarray_sources['xcentroid'])) + 99.
+        for i, source in enumerate(subarray_sources):
+            ra, dec = XY_To_RADec(source['xcentroid'], source['ycentroid'], aperture, attitude_matrix)
+            ra_vals.append(ra)
+            dec_vals.append(dec)
+
+            # Now calculate the pixel value for that RA, Dec on the full frame image
+            ffx, ffy = RADec_To_XY(ra, dec, ff_aperture, ff_attitude_matrix)
+            ff_equiv_x.append(ffx)
+            ff_equiv_y.append(ffy)
+
+            # Check to see if there is a source in the full frame image at this location
+            dx = ffx - full_frame_sources['xcentroid']
+            dy = ffy - full_frame_sources['ycentroid']
+            deltas = np.sqrt(dx**2 + dy**2)
+            subarray_sources['delta_ff'][i] = np.nanmin(deltas)
+
+        subarray_sources['ra'] = ra_vals
+        subarray_sources['dec'] = dec_vals
+        subarray_sources['fullframe_x_equivalent'] = ff_equiv_x
+        subarray_sources['fullframe_y_equivalent'] = ff_equiv_y
+
+        # Save the updated table
+        outfile = os.path.basename(subfile)
+        outname = os.path.join(output_dir, outfile.replace('.fits', '_fullframe_source_comparison.txt'))
+        print('Writing out results to {}'.format(outname))
+        ascii.write(subarray_sources, outname, overwrite=True)
+
+        # Now check the distribution of differences between full frame source locations,
+        # and calculated full frame equivalent locations from the subarray
+        # First, throw out the sources that obviously have no match
+        diffs = subarray_sources['delta_ff'].data
+        good = diffs < 20.
+        med = np.median(diffs[good])
+        dev = np.std(diffs[good])
+        print('\n\nFile: {}'.format(subfile))
+        print('Median difference between subarray source locations and full frame locations: {} pixels'.format(med))
+        print('Standard deviation of differences: {} pixels\n\n\n'.format(dev))
 
 
-def find_sources(data, threshold=30, show_sources=True, plot_name='sources.png'):
+def read_yaml_file(filename):
+    try:
+        with open(filename, 'r') as infile:
+            data = yaml.safe_load(infile)
+    except (ScannerError, FileNotFoundError, IOError) as e:
+        print(e)
+    return data
+
+
+def get_data(filename):
     """
+    Retrieve the data from the given file, along with basic aperture information
+
     Parameters
     ----------
+    filename : str
+        Name of fits file
+
+    Returns
+    -------
     data : numpy.ndarray
-        2D image
+        Multidimensional array of data values
 
-    threshold : float
-        Number of sigma above the background used to determine the
-        presence of a source
+    substrt : tuple
+        Tuple of the (x,y) coordinates of the lower left corner of the aperture
 
-    show_sources : bool
-        If True, create an image with overlain marks showing sources
-
-    plot_name : str
-        Name of file to save the image with marked sources
-
-    Returns
-    -------
-    sources : astropy.table.Table
-        Table of source positions
+    subend : tuple
+        Tuple of the (x,y) coordinates of the upper right corner of the aperture
     """
-    mean, median, std = sigma_clipped_stats(data, sigma=3.0)
-    daofind = DAOStarFinder(fwhm=3.0, threshold=threshold*std)
-    sources = daofind(data - median)
-
-    if show_sources:
-        positions = np.transpose((sources['xcentroid'], sources['ycentroid']))
-        apertures = CircularAperture(positions, r=4.)
-        norm = ImageNormalize(stretch=SqrtStretch())
-        plt.imshow(data, cmap='Greys', origin='lower', norm=norm)
-        apertures.plot(color='blue', lw=1.5, alpha=0.5)
-        plt.savefig(plot_name)
-
-    return sources
-
-def subarray_corners(aperture_name):
-    """Find the offset in x, y between a full frame and the given subarray
-    This function has been stolen from Mirage
-
-    Parameters
-    ----------
-    subarray_name : str
-        Name of aperture
-
-    Returns
-    -------
-    dx : int
-        X-location on the full frame of the subarray lower left corner
-
-    dy : int
-        Y-location on the full frame of the subarray lower left corner
-    """
-    # Get SIAF instance
-    siaf = pysiaf.Siaf('nircam')
-
-    # get master aperture names
-    siaf_detector_layout = pysiaf.iando.read.read_siaf_detector_layout()
-    master_aperture_names = siaf_detector_layout['AperName'].data
-
-    # read pysiaf aperture definition file containing DetRef and SciRef values
-    siaf_aperture_definitions = pysiaf.iando.read.read_siaf_aperture_definitions('nircam')
-
-    # aperture object
-    aperture = siaf[aperture_name]
-
-    # aperture corners in SIAF detector coordinates
-    x_det, y_det = aperture.corners('det', rederive=True)
-
-    # determine parent aperture, i.e. the underlying full frame SCA aperture
-    index = siaf_aperture_definitions['AperName'].tolist().index(aperture_name)
-    aperture._parent_apertures = siaf_aperture_definitions['parent_apertures'][index]
-
-    # If multiuple apertures are listed as parents keep only the first
-    if ';' in aperture._parent_apertures:
-        print('Multiple parent apertures: {}'.format(aperture._parent_apertures))
-        aperture._parent_apertures = aperture._parent_apertures.split(';')[0]
-
-    if aperture_name in master_aperture_names:
-        # if master aperture, use it directly to transform to science frame
-        x_sci, y_sci = aperture.det_to_sci(x_det, y_det)
-    elif aperture._parent_apertures is not None:
-        # use parent aperture for transformation
-        if verbose:
-            print('Using parent {} for {}'.format(aperture._parent_apertures, aperture_name))
-        x_sci, y_sci = siaf[aperture._parent_apertures].det_to_sci(x_det, y_det)
-        aperture = siaf[aperture._parent_apertures]
-
-    if instrument.lower() == 'nircam':
-        if aperture.DetSciParity == 1:
-            corner_index = np.array([1, 3])
-        elif aperture.DetSciParity == -1:
-            # NIRCam will always fall in here, except in case of non-dms orientation
-            corner_index = np.array([0, 2])
-        x_corner = x_sci[corner_index]
-        y_corner = y_sci[corner_index]
-    elif instrument.lower() == 'niriss':
-        x_corner_index = np.array([0, 2])
-        y_corner_index = np.array([0, 2])
-        if aperture_name == 'NIS_CEN_OSS':
-            x_corner_index = np.array([1, 3])
-            y_corner_index = np.array([3, 1])
-        x_corner = x_sci[x_corner_index]
-        y_corner = y_sci[y_corner_index]
-        if aperture_name in ['NIS_SUBSTRIP96', 'NIS_SUBSTRIP256']:
-            x_corner = [1, 2048]
-            y_corner = [1, 2048]
-    elif instrument.lower() == 'fgs':
-        x_corner_index = np.array([0, 2])
-        y_corner_index = np.array([0, 2])
-        if aperture_name == 'FGS1_FULL_OSS':
-            x_corner_index = np.array([1, 3])
-            y_corner_index = np.array([3, 1])
-        if aperture_name == 'FGS2_FULL_OSS':
-            x_corner_index = np.array([1, 3])
-            y_corner_index = np.array([1, 3])
-        x_corner = x_sci[x_corner_index]
-        y_corner = y_sci[y_corner_index]
+    with fits.open(filename) as hdulist:
+        data = hdulist[1].data
+        header = hdulist[0].header
+    data_shape = data.shape
+    if len(data_shape) == 3:
+        ylen, xlen = data_shape[1], data_shape[2]
+    elif len(data_shape) == 2:
+        ylen, xlen = data_shape
     else:
-        raise NotImplementedError(("Instrument {} not supported for SIAF subarray corners"
-                                   .format(instrument)))
+        raise ValueError("Expecting 2D or 3D data, but {} dimensions are {}".format(filename, data_shape))
 
-    # account for mirage conventions (e.g. 0-based indexing)
-    # we also want integer values as these will be indexes
-    x_corner = np.array([np.ceil(x_corner[0]) - 1, np.floor(x_corner[1]) - 1])
-    y_corner = np.array([np.ceil(y_corner[0]) - 1, np.floor(y_corner[1]) - 1])
-    return x_corner.astype(np.int), y_corner.astype(np.int)
+    detector = header['DETECTOR']
+    aperture = header['SUBARRAY']
 
+    substrt = (header['SUBSTRT1'] - 1, header['SUBSTRT2'] - 1)
+    subend = (substrt[0] + xlen, substrt[1] + ylen)
+    return data, substrt, subend, detector, aperture
