@@ -19,28 +19,82 @@ For extended source subarrays (SUB160, SUB320, SUB640, FULL), the target RA, Dec
 For point source subarrays (SUB400P:, S?Ub64P), the target RA, Dec are:
 05:21:55.8187, -69:29:38.25, which is: 80.482577917, -69.493958333
 
+So really maybe all we need to do is confirm for a given input file
+that there is a star located at the RA, Dec of the target star, and that
+that RA, Dec correspond to the reference location (+dither)
 
 """
-
+from astropy.io import ascii
+from jwst.datamodels import ImageModel
 import numpy as np
+import os
+
+from nircam_calib.commissioning.utils.photometry import find_sources, fwhm, get_fwhm
 
 extended_subarr_ref_ra = 80.4875
 extended_subarr_ref_dec = -69.4975
-ptsrc_subarr_ref_ra = 80.482577917
-ptsrc_subarr_ref_dec = -69.493958333
+
+# This is the RA, Dec of the J=14 star as input in APT
+# (NOTE THAT THIS IS ACTUALLY NOT CORRECT. IT'S OFF BY 0.13".
+# HOPEFULLY WE WILL CORRECT THE COORDINATES IN THE APT FILE)
+STAR_RA = 80.482577917
+STAR_DEC = -69.493958333
+
+# Real RA and Dec, from the 2MASS catalog
+real_star_ra = 80.482541
+real_star_dec = -69.493958
 
 
 """
 for a given file:
     1) identify the reference location (x,y)
     2) calculate RA, Dec at the reference location
-    3) check that RA, Dec matches the target RA, Dec
+    3) Calculate pixel that corresponds to RA, Dec of star
+    4) Confirm that the star is at that pixel
+
+
 
 for point source files:
     1) check to see that the intended target is located at the reference location,
     using source finding.
 
 """
+
+def check_pointing(filename, out_dir='./'):
+    """USE THIS
+    """
+    model = ImageModel(filename)
+
+    # Calculate the pixel corresponding to the RA, Dec value of the star
+    world2det = model.meta.wcs.get_transform('world', 'detector')
+    star_x, star_y = world2det(STAR_RA, STAR_DEC)
+
+    # Check to see if the star is actually there
+    sub_fwhm = get_fwhm(model.meta.instrument.filter)
+    sources = find_sources(model.data, threshold=50, fwhm=sub_fwhm, plot_name='{}_source_map.png'.format(os.path.basename(filename)))
+
+    # Calculate the distance from each source to the target
+    dx = sources['xcentroid'] - star_x
+    dy = sources['ycentroid'] - star_y
+    delta = np.sqrt(dx**2 + dy**2)
+
+    # Add distances to the table and save
+    sources['delta_from_target'] = delta
+    basename = os.path.basename(filename)
+    table_out = os.path.join(out_dir, '{}_sources.txt'.format(basename))
+    ascii.write(sources, table_out, overwrite=True)
+
+    min_delta = np.nanmin(delta)
+    print('{}: Minimum distance between calculated target location and measured target location: {} pixels\n'.format(basename, min_delta))
+
+
+
+
+
+
+
+
+
 
 def check_via_wcs(filename):
     """This checks that the WCS in the file agrees with what is expected.
@@ -72,7 +126,7 @@ def check_via_wcs(filename):
     ditherx = header1['X_OFFSET']
     dithery = header1['Y_OFFSET']
 
-    translate dithers to ra, dec
+    #translate dithers to ra, dec
 
     # Calculate the pixel location of the target
     if 'LONG' in h0['DETECTOR']:
@@ -93,8 +147,22 @@ def check_via_source_location(filename, location_threshold=2):
         header0 = hdulist[0].header
         header1 = hdulist[1].header
 
+    # Get filter and calculate FWHM
+    filt = header0['FILTER']
+    psf_fwhm = get_fwhm(filt)
+
     # FIND_SOURCES from confirm_subarray_location_via_sources -- move to utils
-    sources = find_sources(data, threshold=30, show_sources=False)
+    sources = find_sources(data, threshold=500, fwhm=psf_fwhm, show_sources=False)
+
+    # Calculate RA, Dec of sources
+
+
+
+    # Check to see that there is a source close to the RA, Dec of the reference location
+    # in the original undithered pointing
+
+
+
 
     # Account for dither
     ditherx = header1['X_OFFSET']
@@ -135,5 +203,3 @@ def check_targ_ra_dec(hdu, expected_ra, expected_dec):
     """
     assert np.isclose(float(hdu['TARG_RA']), expected_ra, rtol=0., atol=2.8e-7)
     assert np.isclose(float(hdu['TARG_DEC']), expected_dec, rtol=0, atol=2.8e-7)
-
-def ra_dec_at_ref_loc()

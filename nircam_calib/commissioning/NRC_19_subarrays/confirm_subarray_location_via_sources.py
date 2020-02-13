@@ -96,17 +96,21 @@ Tar Tile Exp Dith Aperture Name             Target       RA         Dec        B
 from astropy.io import ascii, fits
 import numpy as np
 import os
-import pysiaf
-import yaml
+#import pysiaf
+#import yaml
 
-from mirage.utils import siaf_interface
+#from mirage.utils import siaf_interface
+from jwst import datamodels
 
 from nircam_calib.commissioning.utils.astrometry import RADec_To_XY, XY_To_RADec
 from nircam_calib.commissioning.utils.photometry import find_sources, fwhm, get_fwhm
 
 
-def run(full_frame_file, subarray_files, output_dir='./'):
+def run_using_fits(full_frame_file, subarray_files, output_dir='./'):
     """MAIN FUNCTION
+
+    THIS VERSION DOES NOT USE DATAMODELS, AND RELIES ON SIAF FOR COORDINATE
+    TRANSFORMS. IT IS MUCH EASIER TO USE THE run() FUNCTION BELOW.
 
     Paramters
     ---------
@@ -126,8 +130,11 @@ def run(full_frame_file, subarray_files, output_dir='./'):
     siaf_instance = pysiaf.Siaf('nircam')
 
     # Read in full frame data and locate sources
-    full_frame = fits.getdata(full_frame_file)
-    ff_header = fits.getheader(full_frame_file)
+    with fits.open(full_frame_file) as ffhdu:
+        full_frame = ffhdu[1].data
+        ff_header = ffhdu[0].header
+        ff_header1 = ffhdu[1].header
+
     ff_det = ff_header['DETECTOR']
     ff_ap_name = ff_header['SUBARRAY']
     if 'LONG' in ff_det:
@@ -144,18 +151,15 @@ def run(full_frame_file, subarray_files, output_dir='./'):
 
     # Read in full frame file's WCS
     ff_filebase = os.path.join('yaml_files', os.path.basename(full_frame_file))
-    ff_yaml_file = ff_filebase.replace('_rate.fits', '.yaml')
-    ff_params = read_yaml_file(ff_yaml_file)
-
     ff_local_roll, ff_attitude_matrix, ff_ffsize, ff_subarray_bounds = siaf_interface.get_siaf_information(siaf_instance, ff_aperture,
-                                                                                                   ff_params['Telescope']['ra'],
-                                                                                                   ff_params['Telescope']['dec'],
-                                                                                                   ff_params['Telescope']['rotation'], v2_arcsec=None,
-                                                                                                   v3_arcsec=None, verbose=False)
+                                                                                                           ff_header1['RA_REF'],
+                                                                                                           ff_header1['DEC_REF'],
+                                                                                                           ff_header1['PA_V3'], v2_arcsec=None,
+                                                                                                           v3_arcsec=None, verbose=False)
 
     # Read in subarray data and locate sources
     for subfile in subarray_files:
-        subarray, start_coords, end_coords, det, ap_name, filt = get_data(subfile)
+        subarray, start_coords, end_coords, det, ap_name, filt, ra_ref, dec_ref, pa_v3 = get_data(subfile)
         if 'LONG' in det:
             det = det.replace('LONG', '5')
         aperture = '{}_{}'.format(det, ap_name)
@@ -165,13 +169,8 @@ def run(full_frame_file, subarray_files, output_dir='./'):
         subarray_sources = find_sources(subarray, threshold=500, fwhm=sub_fwhm, plot_name='{}_source_map.png'.format(os.path.basename(subfile)))
 
         filebase = os.path.join('yaml_files', os.path.basename(subfile))
-        yaml_file = filebase.replace('_rate.fits', '.yaml')
-        params = read_yaml_file(yaml_file)
-
         local_roll, attitude_matrix, ffsize, subarray_bounds = siaf_interface.get_siaf_information(siaf_instance, aperture,
-                                                                                                   params['Telescope']['ra'],
-                                                                                                   params['Telescope']['dec'],
-                                                                                                   params['Telescope']['rotation'], v2_arcsec=None,
+                                                                                                   ra_ref, dec_ref, pa_v3, v2_arcsec=None,
                                                                                                    v3_arcsec=None, verbose=False)
         # Add RA, Dec for each source in subarray image
         ra_vals = []
@@ -221,6 +220,92 @@ def run(full_frame_file, subarray_files, output_dir='./'):
         print('Standard deviation of differences: {} pixels\n\n\n'.format(dev))
 
 
+def run(full_frame_file, subarray_files, output_dir='./'):
+    """MAIN FUNCTION
+
+    Paramters
+    ---------
+    full_frame_file : str
+
+    subarray_files : list
+    """
+    # Determine which full frame image to compare with which subarray images
+    # Detect sources in full-frame image
+    # Detect sources in subarray image
+    # Get subarray location from pysiaf
+    # Add pysiaf result to subarray catalog
+    # Compare full frame catalog to shifted subarray catalog to see how well they match.
+    # For subarrays not centered on the detector (sub64p/sub400p), this will fail because the reference locations are different!!!
+        # In that case, you'll have to use knowledge of the refrence locations to predict source locations
+
+    # Read in full frame data
+    ff_model = datamodels.open(full_frame_file)
+    ff_radec_to_xy = ff_model.meta.wcs.get_transform('world', 'detector')
+
+    # Calculate the FWHM in pixels to input to the source finder
+    ff_fwhm = get_fwhm(ff_model.meta.instrument.filter)
+
+    ffbasename = os.path.basename(full_frame_file)
+    full_frame_sources = find_sources(ff_model.data, threshold=500, fwhm=ff_fwhm, plot_name='{}_full_frame_source_map_datamodels.png'.format(ffbasename))
+    ascii.write(full_frame_sources, '{}_ff_sources_datamodels.txt'.format(ffbasename), overwrite=True)
+
+    # Read in subarray data and locate sources
+    for subfile in subarray_files:
+        sub_model = datamodels.open(subfile)
+        sub_xy_to_radec = sub_model.meta.wcs.get_transform('detector', 'world')
+
+        # Calculate the FWHM in pixels to input to the source finder
+        sub_fwhm = get_fwhm(sub_model.meta.instrument.filter)
+        subarray_sources = find_sources(sub_model.data, threshold=500, fwhm=sub_fwhm, plot_name='{}_source_map_datamodels.png'.format(os.path.basename(subfile)))
+
+        # Add RA, Dec for each source in subarray image
+        ra_vals = []
+        dec_vals = []
+        ff_equiv_x = []
+        ff_equiv_y = []
+
+        # Add an empty column to the table listing the distance to the nearest
+        # full frame source
+        subarray_sources['delta_ff'] = np.zeros(len(subarray_sources['xcentroid'])) + 99.
+        for i, source in enumerate(subarray_sources):
+            ra, dec = sub_xy_to_radec(source['xcentroid'], source['ycentroid'])
+            ra_vals.append(ra)
+            dec_vals.append(dec)
+
+            # Now calculate the pixel value for that RA, Dec on the full frame image
+            ffx, ffy = ff_radec_to_xy(ra, dec)
+            ff_equiv_x.append(ffx)
+            ff_equiv_y.append(ffy)
+
+            # Check to see if there is a source in the full frame image at this location
+            dx = ffx - full_frame_sources['xcentroid']
+            dy = ffy - full_frame_sources['ycentroid']
+            deltas = np.sqrt(dx**2 + dy**2)
+            subarray_sources['delta_ff'][i] = np.nanmin(deltas)
+
+        subarray_sources['ra'] = ra_vals
+        subarray_sources['dec'] = dec_vals
+        subarray_sources['fullframe_x_equivalent'] = ff_equiv_x
+        subarray_sources['fullframe_y_equivalent'] = ff_equiv_y
+
+        # Save the updated table
+        outfile = os.path.basename(subfile)
+        outname = os.path.join(output_dir, outfile.replace('.fits', '_fullframe_source_comparison_datamodels.txt'))
+        print('Writing out results to {}'.format(outname))
+        ascii.write(subarray_sources, outname, overwrite=True)
+
+        # Now check the distribution of differences between full frame source locations,
+        # and calculated full frame equivalent locations from the subarray
+        # First, throw out the sources that obviously have no match
+        diffs = subarray_sources['delta_ff'].data
+        good = diffs < 20.
+        med = np.median(diffs[good])
+        dev = np.std(diffs[good])
+        print('\n\nFile: {}'.format(subfile))
+        print('Median difference between subarray source locations and full frame locations: {} pixels'.format(med))
+        print('Standard deviation of differences: {} pixels\n\n\n'.format(dev))
+
+
 def read_yaml_file(filename):
     try:
         with open(filename, 'r') as infile:
@@ -249,10 +334,30 @@ def get_data(filename):
 
     subend : tuple
         Tuple of the (x,y) coordinates of the upper right corner of the aperture
+
+    detector : str
+        Detector name
+
+    aperture : str
+        Aperture name (e.g. 'SUB160')
+
+    filter_name : str
+        Filter name
+
+    header1['RA_REF'] : float
+        RA at the reference location
+
+    header1['DEC_REF'] : float
+        Dec at the reference location
+
+    header1['PA_V3'] : float
+        Telescope roll angle at (V1, V2) = (0,0)
     """
     with fits.open(filename) as hdulist:
         data = hdulist[1].data
         header = hdulist[0].header
+        header1 = hdulist[1].header
+
     data_shape = data.shape
     if len(data_shape) == 3:
         ylen, xlen = data_shape[1], data_shape[2]
@@ -267,4 +372,4 @@ def get_data(filename):
 
     substrt = (header['SUBSTRT1'] - 1, header['SUBSTRT2'] - 1)
     subend = (substrt[0] + xlen, substrt[1] + ylen)
-    return data, substrt, subend, detector, aperture, filter_name
+    return data, substrt, subend, detector, aperture, filter_name, header1['RA_REF'], header1['DEC_REF'], header1['PA_V3']
