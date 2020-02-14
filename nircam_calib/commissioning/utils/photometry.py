@@ -37,6 +37,7 @@ def find_sources(data, threshold=30, fwhm=3.0, show_sources=True, plot_name='sou
     mean, median, std = sigma_clipped_stats(data, sigma=3.0)
     daofind = DAOStarFinder(fwhm=fwhm, threshold=threshold*std)
     sources = daofind(data - median)
+    print('{} sources found.'.format(len(sources)))
 
     if show_sources:
         positions = np.transpose((sources['xcentroid'], sources['ycentroid']))
@@ -45,6 +46,8 @@ def find_sources(data, threshold=30, fwhm=3.0, show_sources=True, plot_name='sou
         plt.imshow(data, cmap='Greys', origin='lower', norm=norm)
         apertures.plot(color='blue', lw=1.5, alpha=0.5)
         plt.savefig(plot_name)
+        print('Plot saved to {}'.format(plot_name))
+        plt.close()
 
     return sources
 
