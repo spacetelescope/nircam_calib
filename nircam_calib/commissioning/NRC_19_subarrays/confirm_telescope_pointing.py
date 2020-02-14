@@ -66,6 +66,16 @@ for point source files:
 
 def check_pointing_target_star(filename, out_dir='./'):
     """Check that the target star is present at the expected location in the image
+
+    Parameters
+    ----------
+    filename : str
+        Name of fits file containing the observation to check. This file must
+        contain a valid GWCS (i.e. it must have gone through the assign_wcs
+        pipeline step.)
+
+    out_dir : str
+        Name of directory into which source catalogs are written
     """
     model = ImageModel(filename)
     pix_scale = model.meta.wcsinfo.cdelt1 * 3600.
@@ -76,7 +86,9 @@ def check_pointing_target_star(filename, out_dir='./'):
 
     # Check to see if the star is actually there
     sub_fwhm = get_fwhm(model.meta.instrument.filter)
-    found_sources = find_sources(model.data, threshold=50, fwhm=sub_fwhm, plot_name='{}_source_map.png'.format(os.path.basename(filename)))
+    plot_file = '{}_source_map.png'.format(os.path.basename(filename))
+    plot_file = os.path.join(out_dir, plot_file)
+    found_sources = find_sources(model.data, threshold=50, fwhm=sub_fwhm, plot_name=plot_file)
 
     # Calculate the distance from each source to the target
     dx = found_sources['xcentroid'] - star_x
@@ -90,14 +102,28 @@ def check_pointing_target_star(filename, out_dir='./'):
     ascii.write(found_sources, table_out, overwrite=True)
 
     min_delta = np.nanmin(delta)
-    print('{}: Minimum distance between calculated target location and measured target location: {} pixels'.format(basename, min_delta))
+    print(('{}: Minimum distance between calculated target location and measured target '
+           'location: {} pixels'.format(basename, min_delta)))
     full_err = np.sqrt(ra_err**2 + dec_err**2)
-    print('Uncertainty in the source location from 2MASS: RA: {}", Dec: {}", Total: {}"'.format(ra_err, dec_err, full_err))
-    print('                                             = RA: {} pix, Dec: {} pix, Total: {} pix\n\n'.format(ra_err / pix_scale, dec_err / pix_scale, full_err / pix_scale))
+    print(('Uncertainty in the source location from 2MASS: RA: {}", Dec: {}", '
+           'Total: {}"'.format(ra_err, dec_err, full_err)))
+    print(('                                             = RA: {} pix, Dec: {} '
+           'pix, Total: {} pix\n\n'.format(ra_err / pix_scale, dec_err / pix_scale, full_err / pix_scale)))
 
 
 def check_pointing_using_2mass_catalog(filename, out_dir='./'):
-    """
+    """Check that stars from an external 2MASS catalog are present at the expected
+    locations within filename.
+
+    Parameters
+    ----------
+    filename : str
+        Name of fits file containing the observation to check. This file must
+        contain a valid GWCS (i.e. it must have gone through the assign_wcs
+        pipeline step.)
+
+    out_dir : str
+        Name of directory into which source catalogs are written
     """
     model = ImageModel(filename)
     pix_scale = model.meta.wcsinfo.cdelt1 * 3600.
@@ -125,7 +151,9 @@ def check_pointing_using_2mass_catalog(filename, out_dir='./'):
 
     # Find sources in the data
     sub_fwhm = get_fwhm(model.meta.instrument.filter)
-    sources = find_sources(model.data, threshold=50, fwhm=sub_fwhm, plot_name='{}_source_map.png'.format(os.path.basename(filename)))
+    plot_file = '{}_source_map.png'.format(os.path.basename(filename))
+    plot_file = os.path.join(out_dir, plot_file)
+    sources = find_sources(model.data, threshold=50, fwhm=sub_fwhm, plot_name=plot_file)
 
     # Calculate RA, Dec of the sources in the new catalog
     det2world = model.meta.wcs.get_transform('detector', 'world')
@@ -150,100 +178,10 @@ def check_pointing_using_2mass_catalog(filename, out_dir='./'):
     d2d_arcsec = d2d.to(u.arcsec).value
     med_dist = np.nanmedian(d2d_arcsec)
     dev_dist = np.nanstd(d2d_arcsec)
-    print("Median distance between sources in 2MASS catalog and those found in the data: {} arcsec = {} pixels".format(med_dist, med_dist / pix_scale
-        ))
-    print("Average uncertainty in the source locations within the 2MASS catalog: {} = {} pixels".format(np.mean(total_unc), np.mean(total_unc.value) / pix_scale))
-
-
-def check_via_wcs(filename):
-    """This checks that the WCS in the file agrees with what is expected.
-    It doesn't check that the actual pointing is correct.
-
-    LW: have target RA, Dec.
-        have RA, Dec at reference location
-        should be the same after accounting for dithers
-
-    SW: have target RA, Dec (whcih can be outside detector fov)
-        have reference location RA, Dec
-        calc v2,v3 of target, confirm it's the same as in LW?
-        calculate delta bet. target and ref loc, and compare with v2,v3 of ref loc of pointing (between sw detectors)
-
-    """
-    with fits.open(filename) as hdulist:
-        h0 = hdulist[0].header
-        h1 = hdulist[1].header
-
-    # Get the reported RA, Dec at the reference location
-    ra_at_ref = h1['RA_REF']
-    dec_at_ref = h1['DEC_REF']
-
-    # Get the target RA, Dec
-    targ_ra = h0['TARG_RA']
-    targ_dec = h0['TARG_DEC']
-
-    # Account for dither
-    ditherx = header1['X_OFFSET']
-    dithery = header1['Y_OFFSET']
-
-    #translate dithers to ra, dec
-
-    # Calculate the pixel location of the target
-    if 'LONG' in h0['DETECTOR']:
-        delta = ra_at_ref - (targ_ra + ditherra)
-
-
-
-
-def check_via_source_location(filename, location_threshold=2):
-    """This function identifies sources in the input image,
-    and checks that there is a source located at the reference
-    location (after accounting for dithers), and that this corresponds
-    to the target RA, Dec. This will only work for the point source
-    subarrays, where the target in APT is a particular star
-    """
-    with fits.open(file) as hdulist:
-        data = hdulist[1].data
-        header0 = hdulist[0].header
-        header1 = hdulist[1].header
-
-    # Get filter and calculate FWHM
-    filt = header0['FILTER']
-    psf_fwhm = get_fwhm(filt)
-
-    # FIND_SOURCES from confirm_subarray_location_via_sources -- move to utils
-    sources = find_sources(data, threshold=500, fwhm=psf_fwhm, show_sources=False)
-
-    # Calculate RA, Dec of sources
-
-
-
-    # Check to see that there is a source close to the RA, Dec of the reference location
-    # in the original undithered pointing
-
-
-
-
-    # Account for dither
-    ditherx = header1['X_OFFSET']
-    dithery = header1['Y_OFFSET']
-
-    # Get the reference location
-    refx = header0['CRPIX1']
-    refy = header0['CRPIX2']
-
-    # Check to see if the source is at the reference location
-    dx = sources['xcentroid'].data - (refx + ditherx)
-    dy = sources['ycentroid'].data - (refy + dithery)
-    delta = np.sqrt(dx**2 + dy**2)
-    closest = np.nanmin(delta)
-
-    if closest > location_threshold:
-        print(("WARNING: In {}: Source closest to reference location is {} pixels away. This is "
-               "more than the threshold of {} pixels.".format(os.path.basename(filename), closest, location_threshold)))
-    else:
-        print("In {}: found a source {} pixels from the reference location, as expected.".format(os.path.basename(filename), closest))
-
-
+    print(("Median distance between sources in 2MASS catalog and those found in the "
+           "data: {} arcsec = {} pixels".format(med_dist, med_dist / pix_scale)))
+    print(("Average uncertainty in the source locations within the 2MASS catalog: {} = {} "
+           "pixels".format(np.mean(total_unc), np.mean(total_unc.value) / pix_scale)))
 
 
 def check_targ_ra_dec(hdu, expected_ra, expected_dec):
