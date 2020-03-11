@@ -101,14 +101,16 @@ def check_pointing_target_star(filename, out_dir='./'):
     table_out = os.path.join(out_dir, '{}_sources.txt'.format(basename))
     ascii.write(found_sources, table_out, overwrite=True)
 
+    # Closest source - assume this is our target star
     min_delta = np.nanmin(delta)
-    print(('{}: Minimum distance between calculated target location and measured target '
-           'location: {} pixels'.format(basename, min_delta)))
+    print('Target expeted location: ({0:1.2f}, {1:1.2f})'.format(star_x, star_y))
+    print(('{0}:\nDistance between calculated target location and measured target '
+           'location: {1:1.3f} pixels'.format(basename, min_delta)))
     full_err = np.sqrt(ra_err**2 + dec_err**2)
     print(('Uncertainty in the source location from 2MASS: RA: {}", Dec: {}", '
            'Total: {}"'.format(ra_err, dec_err, full_err)))
-    print(('                                             = RA: {} pix, Dec: {} '
-           'pix, Total: {} pix\n\n'.format(ra_err / pix_scale, dec_err / pix_scale, full_err / pix_scale)))
+    print(('                                             = RA: {0:1.2f} pix, Dec: {1:1.2f} '
+           'pix, Total: {2:1.2f} pix\n\n'.format(ra_err / pix_scale, dec_err / pix_scale, full_err / pix_scale)))
 
 
 def check_pointing_using_2mass_catalog(filename, out_dir='./'):
@@ -174,14 +176,30 @@ def check_pointing_using_2mass_catalog(filename, out_dir='./'):
     #c_matches = found_sources[sep_constraint]
     #catalog_matches = from_2mass[idx[sep_constraint]]
 
-    # Get info on median offsets
+    # Print table of sources
     d2d_arcsec = d2d.to(u.arcsec).value
+    cat_2mass['image_x'] = sources[idx]['xcentroid']
+    cat_2mass['image_y'] = sources[idx]['ycentroid']
+    cat_2mass['image_ra'] = sources[idx]['calc_RA']
+    cat_2mass['image_dec'] = sources[idx]['calc_Dec']
+    cat_2mass['delta_sky'] = d2d_arcsec
+    cat_2mass['delta_pix'] = d2d_arcsec / pix_scale
+
+    for colname in ['x', 'y', 'image_x', 'image_y', 'delta_pix']:
+        cat_2mass[colname].info.format = '7.3f'
+
+    print(cat_2mass['x', 'y', 'image_x', 'image_y', 'delta_pix'])
+
+    # Get info on median offsets
     med_dist = np.nanmedian(d2d_arcsec)
     dev_dist = np.nanstd(d2d_arcsec)
     print(("Median distance between sources in 2MASS catalog and those found in the "
-           "data: {} arcsec = {} pixels".format(med_dist, med_dist / pix_scale)))
-    print(("Average uncertainty in the source locations within the 2MASS catalog: {} = {} "
-           "pixels".format(np.mean(total_unc), np.mean(total_unc.value) / pix_scale)))
+           "data: {0:1.2f} arcsec = {1:1.2f} pixels".format(med_dist, med_dist / pix_scale)))
+
+    mean_unc = np.mean(total_unc)
+    mean_unc_pix = np.mean(total_unc.value) / pix_scale
+    print(("Mean uncertainty in the source locations within the 2MASS catalog: {0:1.2f} = {1:1.2f} "
+           "pixels\n\n".format(mean_unc, mean_unc_pix)))
 
 
 def check_targ_ra_dec(hdu, expected_ra, expected_dec):

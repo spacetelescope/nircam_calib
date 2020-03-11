@@ -258,6 +258,11 @@ def run(full_frame_file, subarray_files, output_dir='./'):
         sub_fwhm = get_fwhm(sub_model.meta.instrument.filter)
         subarray_sources = find_sources(sub_model.data, threshold=500, fwhm=sub_fwhm, plot_name='{}_source_map_datamodels.png'.format(os.path.basename(subfile)))
 
+        # If no sources are found in the subarray, then move on to the next
+        if subarray_sources is None:
+            print('No sources found in {}. Skipping.'.format(subfile))
+            continue
+
         # Add RA, Dec for each source in subarray image
         ra_vals = []
         dec_vals = []
@@ -301,7 +306,7 @@ def run(full_frame_file, subarray_files, output_dir='./'):
         good = diffs < 20.
         med = np.median(diffs[good])
         dev = np.std(diffs[good])
-        print('\n\nFile: {}'.format(subfile))
+        print('File: {}'.format(subfile))
         print('Median difference between subarray source locations and full frame locations: {} pixels'.format(med))
         print('Standard deviation of differences: {} pixels\n\n\n'.format(dev))
 

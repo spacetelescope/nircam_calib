@@ -63,7 +63,7 @@ def do_photometry(image, source_table, aperture_radius=3, subtract_background=Fa
     return source_table
 
 
-def find_sources(data, threshold=30, fwhm=3.0, show_sources=True, plot_name='sources.png'):
+def find_sources(data, threshold=30, fwhm=3.0, show_sources=True, save_sources=False, plot_name='sources.png'):
     """Use photutils' DAOFind to locate sources in the input image.
 
     Parameters
@@ -77,6 +77,9 @@ def find_sources(data, threshold=30, fwhm=3.0, show_sources=True, plot_name='sou
 
     show_sources : bool
         If True, create an image with overlain marks showing sources
+
+    save_sources : bool
+        If True, save the image of the source locations at ```plot_name```
 
     plot_name : str
         Name of file to save the image with marked sources
@@ -92,14 +95,17 @@ def find_sources(data, threshold=30, fwhm=3.0, show_sources=True, plot_name='sou
     if sources is not None:
         print('{} sources found.'.format(len(sources)))
 
-        if show_sources:
+        if show_sources or save_sources:
             positions = np.transpose((sources['xcentroid'], sources['ycentroid']))
             apertures = CircularAperture(positions, r=4.)
             norm = ImageNormalize(stretch=SqrtStretch())
             plt.imshow(data, cmap='Greys', origin='lower', norm=norm)
             apertures.plot(color='blue', lw=1.5, alpha=0.5)
-            plt.savefig(plot_name)
-            print('Plot saved to {}'.format(plot_name))
+            if show_sources:
+                plt.show()
+            if save_sources:
+                plt.savefig(plot_name)
+                print('Plot saved to {}'.format(plot_name))
             plt.close()
     else:
         print('No sources found.')

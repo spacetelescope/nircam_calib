@@ -118,9 +118,9 @@ def compare_rate_images(subarray_file, fullframe_file):
 
     # Locate sources
     sub_fwhm = get_fwhm(subarray.meta.instrument.filter)
-    sub_sources = find_sources(subarray.data, threshold=500, fwhm=sub_fwhm, plot_name='{}_subarray_source_map_datamodels.png'.format(os.path.basename(subarray_file)))
+    sub_sources = find_sources(subarray.data, threshold=200, fwhm=sub_fwhm, show_sources=True, save_sources=True, plot_name='{}_subarray_source_map_datamodels.png'.format(os.path.basename(subarray_file)))
     ff_fwhm = get_fwhm(fullframe.meta.instrument.filter)
-    ff_sources = find_sources(fullframe.data, threshold=500, fwhm=ff_fwhm, plot_name='{}_fullframe_map_datamodels.png'.format(os.path.basename(fullframe_file)))
+    ff_sources = find_sources(fullframe.data, threshold=200, fwhm=ff_fwhm, show_sources=True, save_sources=True, plot_name='{}_fullframe_map_datamodels.png'.format(os.path.basename(fullframe_file)))
 
     if sub_sources is None:
         print("No subarray sources to compare.")
@@ -168,14 +168,53 @@ def compare_rate_images(subarray_file, fullframe_file):
     num_matched = len(ff_catalog_matches)
     print('Found {} matching sources.'.format(num_matched))
     if num_matched == 0:
-        print("Quitting.")
+        print("No matching sources found. Quitting.")
         return 0
+
+
+    # What if we just do photometry on the sources in the subarray and their
+    # calculated positions in the full frame?
+    sub_pos = []
+    ff_pos = []
+    good_indexes = []
+    non_zero_sub_dq = []
+    non_zero_full_dq = []
+    for i, line in enumerate(sub_sources):
+        if ((line['fullframe_x'] > 5) & (line['fullframe_x'] < 2039) & \
+            (line['fullframe_y'] > 5) & (line['fullframe_y'] < 2039)):
+            sub_pos.append((line['xcentroid'], line['ycentroid']))
+            ff_pos.append((line['fullframe_x'], line['fullframe_y']))
+            good_indexes.append(i)
+
+            # Make a note if there are any non-zero DQ flags within the apertures
+            # During development, found some cases with NO_LIN_CORR and NO_FLAT_FIELD
+            # that were screwing up photometry
+            yc_sub = np.int(np.round(line['ycentroid']))
+            xc_sub = np.int(np.round(line['xcentroid']))
+            sub_dq = subarray.dq[yc_sub-3:yc_sub+4, xc_sub-3:xc_sub+4]
+            if np.sum(sub_dq) > 0:
+                non_zero_sub_dq.append(True)
+            else:
+                non_zero_sub_dq.append(False)
+
+            yc = np.int(np.round(line['fullframe_x']))
+            xc = np.int(np.round(line['fullframe_y']))
+            sub_dq = fullframe.dq[yc-1:yc+2, xc-1:xc+2]
+            if np.sum(sub_dq) > 0:
+                non_zero_full_dq.append(True)
+            else:
+                non_zero_full_dq.append(False)
+
+
+    print('Performing photometry on a total of {} sources.'.format(len(sub_pos)))
+
 
     # Now perform aperture photometry on the sources in the subarray
     # and full frame data. Keep the aperture small since the difference
     # in exposure time and SNR will be large
-    sub_pos = [(m['xcentroid'], m['ycentroid']) for m in sub_catalog_matches]
-    ff_pos = [(m['xcentroid'], m['ycentroid']) for m in ff_catalog_matches]
+    #sub_pos = [(m['xcentroid'], m['ycentroid']) for m in sub_catalog_matches]
+    #ff_pos = [(m['xcentroid'], m['ycentroid']) for m in ff_catalog_matches]
+
 
     sub_aperture = CircularAperture(sub_pos, r=3.)
     ff_aperture = CircularAperture(ff_pos, r=3.)
@@ -204,12 +243,39 @@ def compare_rate_images(subarray_file, fullframe_file):
     sub_phot_table['delta_from_fullframe'] = delta_phot
     sub_phot_table['delta_from_fullframe_percent'] = delta_phot_perc
 
-    print("Percent diff't from subarray: ")
-    print(delta_phot_perc)
-    print("Difference: full frame - subarray:")
-    print(delta_phot)
-    print('Median difference: {} MJy/sr'.format(np.median(delta_phot)))
-    print('Median percentage difference: {}%'.format(np.median(delta_phot_perc)))
+    # Keep track of whether there are bad pixels in the apertures
+    sub_dq = np.zeros(len(sub_sources), dtype=bool)
+    sub_dq[good_indexes] = non_zero_sub_dq
+    sub_sources['sub_dq'] = sub_dq
+    full_dq = np.zeros(len(sub_sources), dtype=bool)
+    full_dq[good_indexes] = non_zero_full_dq
+    sub_sources['full_dq'] = full_dq
+
+    # Add photometry to the table
+    sub_phot_data = np.zeros(len(sub_sources))
+    sub_phot_data[good_indexes] = sub_phot_table['aper_sum_bkgsub'].data
+    ff_phot_data = np.zeros(len(sub_sources))
+    ff_phot_data[good_indexes] = ff_phot_table['aper_sum_bkgsub'].data
+    delta_phot_col = np.zeros(len(sub_sources))
+    delta_phot_col[good_indexes] = delta_phot
+    delta_phot_perc_col = np.zeros(len(sub_sources))
+    delta_phot_perc_col[good_indexes] = delta_phot_perc
+
+    sub_sources['sub_phot'] = sub_phot_data
+    sub_sources['ff_phot'] = ff_phot_data
+    sub_sources['d_phot'] = delta_phot_col
+    sub_sources['d_phot_p'] = delta_phot_perc
+
+    sub_sources['xcentroid'].info.format = '7.3f'
+    sub_sources['ycentroid'].info.format = '7.3f'
+    sub_sources['fullframe_x'].info.format = '7.3f'
+    sub_sources['fullframe_y'].info.format = '7.3f'
+    sub_sources['sub_phot'].info.format = '7.3f'
+    sub_sources['ff_phot'].info.format = '7.3f'
+    sub_sources['d_phot'].info.format = '7.3f'
+    sub_sources['d_phot_p'].info.format = '7.3f'
+    print(sub_sources['xcentroid', 'ycentroid', 'fullframe_x', 'fullframe_y', 'sub_phot', 'ff_phot', 'd_phot_p', 'sub_dq', 'full_dq'])
+    print('')
 
 
 def median_background(annulus_masks, data):
