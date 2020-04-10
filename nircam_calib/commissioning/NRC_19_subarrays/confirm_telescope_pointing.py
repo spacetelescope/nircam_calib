@@ -204,6 +204,9 @@ def check_pointing_using_2mass_catalog(filename, out_dir='./'):
 
 def check_targ_ra_dec(hdu, expected_ra, expected_dec):
     """Confirm that the values of the TARG_RA and TARG_DEC are as expected
+    The RA, Dec value at the reference location should match the target
+    RA, Dec in the APT file.  This should only be true for the LW channel
+    data though. It should not be true for each of the 4 SW detectors.
 
     Parameters
     ----------
@@ -216,5 +219,14 @@ def check_targ_ra_dec(hdu, expected_ra, expected_dec):
     expected_dec : float
         Expected target Dec in decimal degrees
     """
+    channel = hdu['CHANNEL']
+
+    # This function won't work for SW data
+    if channel.upper() == 'SW':
+        print('check_targ_ra_dec not intended for SW data.')
+        return 0
+
     assert np.isclose(float(hdu['TARG_RA']), expected_ra, rtol=0., atol=2.8e-7)
     assert np.isclose(float(hdu['TARG_DEC']), expected_dec, rtol=0, atol=2.8e-7)
+
+    print("Pointing appears to be correct.")
