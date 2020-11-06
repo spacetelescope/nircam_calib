@@ -247,20 +247,22 @@ def run(full_frame_file, subarray_files, output_dir='./'):
 
     ffbasename = os.path.basename(full_frame_file)
     full_frame_sources = find_sources(ff_model.data, threshold=500, fwhm=ff_fwhm, plot_name='{}_full_frame_source_map_datamodels.png'.format(ffbasename))
-    ascii.write(full_frame_sources, '{}_ff_sources_datamodels.txt'.format(ffbasename), overwrite=True)
+    ascii.write(full_frame_sources, os.path.join(output_dir, '{}_ff_sources_datamodels.txt'.format(ffbasename)), overwrite=True)
 
     # Read in subarray data and locate sources
+    print("Locating sources in subarray files...")
     for subfile in subarray_files:
         sub_model = datamodels.open(subfile)
         sub_xy_to_radec = sub_model.meta.wcs.get_transform('detector', 'world')
 
         # Calculate the FWHM in pixels to input to the source finder
         sub_fwhm = get_fwhm(sub_model.meta.instrument.filter)
-        subarray_sources = find_sources(sub_model.data, threshold=500, fwhm=sub_fwhm, plot_name='{}_source_map_datamodels.png'.format(os.path.basename(subfile)))
+        plotname = os.path.join(output_dir, '{}_source_map_datamodels.png'.format(os.path.basename(subfile)))
+        subarray_sources = find_sources(sub_model.data, threshold=500, fwhm=sub_fwhm, plot_name=plotname)
 
         # If no sources are found in the subarray, then move on to the next
         if subarray_sources is None:
-            print('No sources found in {}. Skipping.'.format(subfile))
+            print('No sources found in {}. Skipping.\n'.format(subfile))
             continue
 
         # Add RA, Dec for each source in subarray image
@@ -304,11 +306,16 @@ def run(full_frame_file, subarray_files, output_dir='./'):
         # First, throw out the sources that obviously have no match
         diffs = subarray_sources['delta_ff'].data
         good = diffs < 20.
-        med = np.median(diffs[good])
-        dev = np.std(diffs[good])
-        print('File: {}'.format(subfile))
-        print('Median difference between subarray source locations and full frame locations: {} pixels'.format(med))
-        print('Standard deviation of differences: {} pixels\n\n\n'.format(dev))
+        if len(good) == 0:
+            print("No matching sources found with an error of less than 20 pixels. Differences "
+                  "(in pixels) are: {}. Skipping.\n".format(diffs))
+        else:
+            print('{} matching sources found between this file and the full frame file.'.format(len(good)))
+            med = np.median(diffs[good])
+            dev = np.std(diffs[good])
+            print('File: {}'.format(subfile))
+            print('Median difference between subarray source locations and full frame locations: {} pixels'.format(med))
+            print('Standard deviation of differences: {} pixels\n\n\n'.format(dev))
 
 
 def read_yaml_file(filename):

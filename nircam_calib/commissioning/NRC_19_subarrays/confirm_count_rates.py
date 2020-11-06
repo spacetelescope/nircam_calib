@@ -54,11 +54,11 @@ from photutils import CircularAperture, CircularAnnulus
 from nircam_calib.commissioning.utils.photometry import find_sources, get_fwhm
 
 
-def compare_level3_catalogs(subarray_cat_file, fullframe_cat_file, output_name):
+def compare_level3_catalogs(cat_file_1, cat_file_2, output_name, out_dir='./'):
     """MAIN FUNCTION"""
     # Read in catalogs
-    cat_sub = ascii.read(subarray_cat_file)
-    cat_full = ascii.read(fullframe_cat_file)
+    cat1 = ascii.read(cat_file_1)
+    cat2 = ascii.read(cat_file_2)
 
     # Create output catalog and lists for results
     output_cat = Table()
@@ -72,45 +72,66 @@ def compare_level3_catalogs(subarray_cat_file, fullframe_cat_file, output_name):
     out_mag_err = []
 
     # Match catalogs
-    c_sub = SkyCoord(ra=cat_sub['sky_centroid.ra'] * u.degree, dec=cat_sub['sky_centroid.dec'] * u.degree)
-    c_full = SkyCoord(ra=cat_full['sky_centroid.ra'] * u.degree, dec=cat_full['sky_centroid.dec'] * u.degree)
-    idx, d2d, d3d = c_sub.match_to_catalog_sky(c_full)
+    #c_sub = SkyCoord(ra=cat1['sky_centroid.ra'] * u.degree, dec=cat1['sky_centroid.dec'] * u.degree)
+    #c_full = SkyCoord(ra=cat2['sky_centroid.ra'] * u.degree, dec=cat2['sky_centroid.dec'] * u.degree)
+    idx, d2d, d3d = cat1['sky_centroid'].match_to_catalog_sky(cat2['sky_centroid'])
 
     # Remove bad matches
     max_sep = 0.06 * u.arcsec  # Match 1 LW pix or 2 SW pix
     sep_constraint = d2d < max_sep
-    sub_catalog_matches = cat_sub[sep_constraint]
-    ff_catalog_matches = cat_full[idx[sep_constraint]]
-    print('Found {} matching sources.'.format(len(ff_catalog_matches)))
+    catalog_1_matches = cat1[sep_constraint]
+    catalog_2_matches = cat2[idx[sep_constraint]]
+    print('Found {} matching sources.'.format(len(catalog_2_matches)))
 
-    delta_flux = ff_catalog_matches['source_sum'] - sub_catalog_matches['source_sum']
-    delta_mag = ff_catalog_matches['abmag'] - sub_catalog_matches['abmag']
-    flux_err = np.sqrt(ff_catalog_matches['source_sum_er']**2 + sub_catalog_matches['source_sum_er']**2)
+    delta_flux = catalog_2_matches['aper30_flux'] - catalog_1_matches['aper30_flux']
+    delta_flux_perc = delta_flux / catalog_2_matches['aper30_flux'] * 100.
+    delta_mag = catalog_2_matches['aper30_abmag'] - catalog_1_matches['aper30_abmag']
+    flux_err = np.sqrt(catalog_2_matches['aper30_flux_err']**2 + catalog_2_matches['aper30_flux_err']**2)
 
-    output_cat['fullframe_RA'] = ff_catalog_matches['sky_centroid.ra']
-    output_cat['fullframe_Dec'] = ff_catalog_matches['sky_centroid.dec']
-    output_cat['fullframe_flux'] = ff_catalog_matches['source_sum']
-    output_cat['fullframe_fluxerr'] = ff_catalog_matches['source_sum_er']
-    output_cat['fullframe_mag'] = ff_catalog_matches['abmag']
-    output_cat['fullframe_magerr'] = ff_catalog_matches['abmag_err']
-    output_cat['subarray_RA'] = sub_catalog_matches['sky_centroid.ra']
-    output_cat['subarray_Dec'] = sub_catalog_matches['sky_centroid.dec']
-    output_cat['subarray_flux'] = sub_catalog_matches['source_sum']
-    output_cat['subarray_fluxerr'] = sub_catalog_matches['source_sum_er']
-    output_cat['subarray_mag'] = sub_catalog_matches['abmag']
-    output_cat['subarray_magerr'] = sub_catalog_matches['abmag_err']
+    output_cat['cat1_pos'] = catalog_1_matches['sky_centroid']
+    output_cat['cat1_flux'] = catalog_1_matches['aper30_flux']
+    output_cat['cat1_fluxerr'] = catalog_1_matches['aper30_flux_err']
+    output_cat['cat1_mag'] = catalog_1_matches['aper30_abmag']
+    output_cat['cat1_magerr'] = catalog_1_matches['aper30_abmag_err']
+    output_cat['cat2_pos'] = catalog_2_matches['sky_centroid']
+    output_cat['cat2_flux'] = catalog_2_matches['aper30_flux']
+    output_cat['cat2_fluxerr'] = catalog_2_matches['aper30_flux_err']
+    output_cat['cat2_mag'] = catalog_2_matches['aper30_abmag']
+    output_cat['cat2_magerr'] = catalog_2_matches['aper30_abmag_err']
     output_cat['delta_flux'] = delta_flux
+    output_cat['delta_flux_perc'] = delta_flux_perc
     output_cat['delta_mag'] = delta_mag
     output_cat['fluxerr_full_minus_sub'] = flux_err
-    ascii.write(output_cat, output_name)
+    output_cat.meta['comments'] = ['cat1 = {}'.format(cat_file_1), 'cat2 = {}'.format(cat_file_2)]
+    ascii.write(output_cat, os.path.join(out_dir, output_name), overwrite=True)
 
-    print("Median and stdev percentage flux difference between full frame and subarray: ")
-    perc = delta_flux / ff_catalog_matches['source_sum'] * 100.
+    print(output_cat['cat1_pos', 'cat1_flux', 'cat2_flux', 'delta_flux', 'delta_flux_perc'])
+
+    print("Median and stdev percentage flux difference between the matched sources in the two catalogs: ")
+    perc = delta_flux / catalog_2_matches['aper30_flux'] * 100.
     print(np.median(perc), np.std(perc))
+    return output_cat
 
 
-def compare_rate_images(subarray_file, fullframe_file):
+def compare_rate_images(subarray_file, fullframe_file, out_dir='./'):
     """MAIN FUNCTiON FOR COMPARING SOURCE RATES IN RATE FILES
+
+    Parameters
+    ----------
+    subarray_file : str
+        Fits file containing the subarray data to be compared
+
+    fullframe_file : sr
+        Fits file containing the full frame data to be compared
+
+    out_dir : str
+        Output directory into which products are saved
+
+    Returns
+    -------
+    sub_sources : astropy.table.Table
+        Table of source positions, equivalent full frame positions, and photometry
+        results from the data
     """
     # Read in data
     subarray = datamodels.open(subarray_file)
@@ -118,9 +139,11 @@ def compare_rate_images(subarray_file, fullframe_file):
 
     # Locate sources
     sub_fwhm = get_fwhm(subarray.meta.instrument.filter)
-    sub_sources = find_sources(subarray.data, threshold=200, fwhm=sub_fwhm, show_sources=True, save_sources=True, plot_name='{}_subarray_source_map_datamodels.png'.format(os.path.basename(subarray_file)))
+    sub_source_image = os.path.join(out_dir, '{}_subarray_source_map_countrate_compare.png'.format(os.path.basename(subarray_file)))
+    sub_sources = find_sources(subarray.data, threshold=200, fwhm=sub_fwhm, show_sources=True, save_sources=True, plot_name=sub_source_image)
     ff_fwhm = get_fwhm(fullframe.meta.instrument.filter)
-    ff_sources = find_sources(fullframe.data, threshold=200, fwhm=ff_fwhm, show_sources=True, save_sources=True, plot_name='{}_fullframe_map_datamodels.png'.format(os.path.basename(fullframe_file)))
+    full_source_image = os.path.join(out_dir, '{}_fullframe_map_datamodels.png'.format(os.path.basename(fullframe_file)))
+    ff_sources = find_sources(fullframe.data, threshold=200, fwhm=ff_fwhm, show_sources=True, save_sources=True, plot_name=full_source_image)
 
     if sub_sources is None:
         print("No subarray sources to compare.")
@@ -169,8 +192,7 @@ def compare_rate_images(subarray_file, fullframe_file):
     print('Found {} matching sources.'.format(num_matched))
     if num_matched == 0:
         print("No matching sources found. Quitting.")
-        return 0
-
+        return 0, 0
 
     # What if we just do photometry on the sources in the subarray and their
     # calculated positions in the full frame?
@@ -264,7 +286,7 @@ def compare_rate_images(subarray_file, fullframe_file):
     sub_sources['sub_phot'] = sub_phot_data
     sub_sources['ff_phot'] = ff_phot_data
     sub_sources['d_phot'] = delta_phot_col
-    sub_sources['d_phot_p'] = delta_phot_perc
+    sub_sources['d_phot_p'] = delta_phot_perc_col
 
     sub_sources['xcentroid'].info.format = '7.3f'
     sub_sources['ycentroid'].info.format = '7.3f'
@@ -276,6 +298,28 @@ def compare_rate_images(subarray_file, fullframe_file):
     sub_sources['d_phot_p'].info.format = '7.3f'
     print(sub_sources['xcentroid', 'ycentroid', 'fullframe_x', 'fullframe_y', 'sub_phot', 'ff_phot', 'd_phot_p', 'sub_dq', 'full_dq'])
     print('')
+
+    # Save the complete table
+    sub_base = os.path.basename(subarray_file).replace('.fits', '')
+    full_base = os.path.basename(fullframe_file).replace('.fits', '')
+    table_name = os.path.join(out_dir, 'photometry_comparison_{}_{}.txt'.format(sub_base, full_base))
+    ascii.write(sub_sources, table_name, overwrite=True)
+    print('Photometry results saved to: {}'.format(table_name))
+
+    # Try filtering out sources where there is a pixel flagged in the full
+    # frame or subarray DQ mask at the source location
+    clean = []
+    for row in sub_sources:
+        clean.append(row['sub_dq'] == False and row['full_dq'] == False)
+    if np.sum(clean) > 0:
+        clean_table = sub_sources[clean]
+        print('Excluding sources with a pixel flagged in the DQ array:')
+        med_clean_diff = np.around(np.median(clean_table['d_phot_p']), 1)
+        print('Median photometry difference between subarray and full frame sources is: {}%'.format(med_clean_diff))
+    else:
+        clean_table = None
+        print('No sources without a flagged pixel in the DQ arrays.')
+    return sub_sources, clean_table
 
 
 def median_background(annulus_masks, data):
@@ -304,4 +348,116 @@ def median_background(annulus_masks, data):
     return np.array(bkg_median)
 
 
+def ratio_images(file1, file2, out_dir='./'):
+    """Ratio the two input images in order to compare signal rates.
+    The input images should have the same pointing
 
+    Parameters
+    ----------
+    file1 : str
+        Fits file containing the first image
+
+    file2 : str
+        Fits file containing the second image
+
+    out_dir : str
+        Directory into which the ratio image will be saved
+        as a fits file
+
+    Returns
+    -------
+    ratio : numpy.ndarray
+        2D ratio image
+
+    med : float
+        Median value of the ratio image
+    """
+    # Get the data
+    fobj1 = fits.open(file1)
+    fobj2 = fits.open(file2)
+
+    # Crop arrays to match
+    cropped_fobj1, cropped_fobj2 = crop_array(fobj1, fobj2)
+
+    # Ratio image
+    ratio = cropped_fobj1[1].data / cropped_fobj2[1].data
+    med = np.median(ratio)
+
+    # Save the cropped arrays and ratio image
+    h0 = fits.PrimaryHDU(cropped_fobj1)
+    h1 = fits.ImageHDU(cropped_fobj2)
+    h2 = fits.ImageHDU(ratio)
+    h0.header = fobj1[0].header
+    h1.header = fobj2[0].header
+    hdulist = fits.HDUList([h0, h1, h2])
+
+    f1_base = os.path.basename(file1).replace('.fits', '')
+    f2_base = os.path.basename(file2).replace('.fits', '')
+    outfile = os.path.join(out_dir, 'ratio_image_{}_{}.fits'.format(f1_base, f2_base))
+    hdulist.writeto(outfile, overwrite=True)
+    print('Ratio image saved to: {}'.format(outfile))
+
+    return ratio, med
+
+
+def crop_array(hdu1, hdu2):
+    """Crop the data from two hdu lists to matching sizes
+    and locations on the detector
+
+    Parameters
+    ----------
+    hdu1 : astropy.fits.HDUList
+
+    hdu2 : astropy.fits.HDUList
+
+    Returns
+    -------
+    hdu1
+    hdu2
+    """
+    data1 = hdu1[1].data
+    header1_0 = hdu1[0].header
+
+    data2 = hdu2[1].data
+    header2_0 = hdu2[0].header
+
+    # Check the location of the images with respect to the
+    # full detector. Remember that coordinates in the header
+    # are indexed to 1, so adjust for python
+    xstart1 = header1_0['SUBSTRT1'] - 1
+    xsize1 = header1_0['SUBSIZE1']
+    xend1 = xstart1 + xsize1
+    ystart1 = header1_0['SUBSTRT2'] - 1
+    ysize1 = header1_0['SUBSIZE2']
+    yend1 = ystart1 + ysize1
+
+    xstart2 = header2_0['SUBSTRT1'] - 1
+    xsize2 = header2_0['SUBSIZE1']
+    xend2 = xstart2 + xsize2
+    ystart2 = header2_0['SUBSTRT2'] - 1
+    ysize2 = header2_0['SUBSIZE2']
+    yend2 = ystart2 + ysize2
+
+    if xstart1 <= xstart2:
+        dx = xstart2 - xstart1
+    else:
+        dx = xstart1 - xstart2
+
+    if ystart1 <= ystart2:
+        dy = ystart2 - ystart1
+    else:
+        dy = ystart1 - ystart2
+
+    # Only need to compare ysizes to find which subarray is larger
+    # and should be cropped. That's because all subarrays are square
+    # with the exception of the substripe subarray for TSO data. That
+    # subarray doesn't overlap with any of the other apertures besides
+    # the full frame. Checking the ysize can distinguish all cases then.
+    if ysize1 < ysize2:
+        data2 = data2[dy: dy+ysize1, dx: dx+xsize1]
+        hdu2[1].data = data2
+    elif ysize2 < ysize1:
+        data1 = data1[dy: dy+ysize2, dx: dx+xsize2]
+        hdu1[1].data = data1
+
+    return hdu1, hdu2

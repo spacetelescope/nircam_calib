@@ -31,6 +31,8 @@ from jwst.datamodels import ImageModel
 import numpy as np
 import os
 
+from mirage.apt.apt_inputs import AptInput
+
 from nircam_calib.commissioning.utils.photometry import find_sources, fwhm, get_fwhm
 
 extended_subarr_ref_ra = 80.4875
@@ -76,6 +78,12 @@ def check_pointing_target_star(filename, out_dir='./'):
 
     out_dir : str
         Name of directory into which source catalogs are written
+
+    Returns
+    -------
+    min_delta : float
+        Distance, in pixels, between the expected and measured locations of the
+        target
     """
     model = ImageModel(filename)
     pix_scale = model.meta.wcsinfo.cdelt1 * 3600.
@@ -100,10 +108,11 @@ def check_pointing_target_star(filename, out_dir='./'):
     basename = os.path.basename(filename)
     table_out = os.path.join(out_dir, '{}_sources.txt'.format(basename))
     ascii.write(found_sources, table_out, overwrite=True)
+    print('Source details saved to: {}'.format(table_out))
 
     # Closest source - assume this is our target star
     min_delta = np.nanmin(delta)
-    print('Target expeted location: ({0:1.2f}, {1:1.2f})'.format(star_x, star_y))
+    print('Target expected location: ({0:1.2f}, {1:1.2f})'.format(star_x, star_y))
     print(('{0}:\nDistance between calculated target location and measured target '
            'location: {1:1.3f} pixels'.format(basename, min_delta)))
     full_err = np.sqrt(ra_err**2 + dec_err**2)
@@ -111,6 +120,7 @@ def check_pointing_target_star(filename, out_dir='./'):
            'Total: {}"'.format(ra_err, dec_err, full_err)))
     print(('                                             = RA: {0:1.2f} pix, Dec: {1:1.2f} '
            'pix, Total: {2:1.2f} pix\n\n'.format(ra_err / pix_scale, dec_err / pix_scale, full_err / pix_scale)))
+    return min_delta
 
 
 def check_pointing_using_2mass_catalog(filename, out_dir='./'):
@@ -126,7 +136,24 @@ def check_pointing_using_2mass_catalog(filename, out_dir='./'):
 
     out_dir : str
         Name of directory into which source catalogs are written
+
+    Returns
+    -------
+    med_dist : float
+        Median offset between expected and measured source locations, in arcsec
+
+    dev_dist : float
+        Standard deviation of the offset between expected and measured source
+        locations, in arcsec
+
+    mean_unc : float
+        Mean uncertainty in the source locoations in the 2MASS catalog, in arcsec
+
+    d2d_arcsec : list
+        Offsets between expected and measured source locations for all matched
+        sources, in arcsec
     """
+    print("Working on: {}".format(os.path.basename(filename)))
     model = ImageModel(filename)
     pix_scale = model.meta.wcsinfo.cdelt1 * 3600.
 
@@ -149,6 +176,11 @@ def check_pointing_using_2mass_catalog(filename, out_dir='./'):
     ydim, xdim = model.data.shape
     good = ((star_x > 0) & (star_x < xdim) & (star_y > 0) & (star_y < ydim))
     print('{} 2MASS sources should be present on the detector.'.format(np.sum(good)))
+
+    if np.sum(good) == 0:
+        print('Skipping.\n')
+        return None, None, None, None
+
     cat_2mass = cat_2mass[good]
 
     # Find sources in the data
@@ -168,14 +200,6 @@ def check_pointing_using_2mass_catalog(filename, out_dir='./'):
     from_2mass = SkyCoord(ra=cat_2mass['ra'] * u.degree, dec=cat_2mass['dec'] * u.degree)
     idx, d2d, d3d = from_2mass.match_to_catalog_3d(found_sources)
 
-    # Filter out bad matches Remember, if you have sources
-    # in the data other than 2MASS stars, good matches will not be
-    # found for those stars and that will contaminate the median distance.
-    #max_sep = 1.0 * u.arcsec
-    #sep_constraint = d2d < max_sep
-    #c_matches = found_sources[sep_constraint]
-    #catalog_matches = from_2mass[idx[sep_constraint]]
-
     # Print table of sources
     d2d_arcsec = d2d.to(u.arcsec).value
     cat_2mass['image_x'] = sources[idx]['xcentroid']
@@ -190,6 +214,12 @@ def check_pointing_using_2mass_catalog(filename, out_dir='./'):
 
     print(cat_2mass['x', 'y', 'image_x', 'image_y', 'delta_pix'])
 
+    # Save the table of sources
+    table_file = 'comp_found_sources_to_2MASS_{}.txt'.format(os.path.basename(filename))
+    table_file = os.path.join(out_dir, table_file)
+    print('Table of source location comparison saved to: {}'.format(table_file))
+    ascii.write(cat_2mass, table_file, overwrite=True)
+
     # Get info on median offsets
     med_dist = np.nanmedian(d2d_arcsec)
     dev_dist = np.nanstd(d2d_arcsec)
@@ -200,13 +230,14 @@ def check_pointing_using_2mass_catalog(filename, out_dir='./'):
     mean_unc_pix = np.mean(total_unc.value) / pix_scale
     print(("Mean uncertainty in the source locations within the 2MASS catalog: {0:1.2f} = {1:1.2f} "
            "pixels\n\n".format(mean_unc, mean_unc_pix)))
+    return med_dist, dev_dist, mean_unc, d2d_arcsec
 
 
 def check_targ_ra_dec(hdu, expected_ra, expected_dec):
     """Confirm that the values of the TARG_RA and TARG_DEC are as expected
     The RA, Dec value at the reference location should match the target
-    RA, Dec in the APT file.  This should only be true for the LW channel
-    data though. It should not be true for each of the 4 SW detectors.
+    RA, Dec in the APT file. This really only checks that the target
+    RA, Dec from the APT file are copied into the output file.
 
     Parameters
     ----------
@@ -218,15 +249,47 @@ def check_targ_ra_dec(hdu, expected_ra, expected_dec):
 
     expected_dec : float
         Expected target Dec in decimal degrees
+
+    Returns
+    -------
+    recorded_ra : float
+        RA value in TARG_RA keyword
+
+    recorded_dec : float
+        Dec value in TARG_DEC keyword
     """
-    channel = hdu['CHANNEL']
+    recorded_ra = float(hdu['TARG_RA'])
+    recorded_dec = float(hdu['TARG_DEC'])
+    ra_check = np.isclose(recorded_ra, expected_ra, rtol=0., atol=2.8e-7)
+    de_check = np.isclose(recorded_dec, expected_dec, rtol=0, atol=2.8e-7)
 
-    # This function won't work for SW data
-    if channel.upper() == 'SW':
-        print('check_targ_ra_dec not intended for SW data.')
-        return 0
+    if not ra_check:
+        print('RA disagrees between expected value and that in TARG_RA: {}, {}'.format(expected_ra, recorded_ra))
+    if not dec_check:
+        print('Dec disagrees between expected value and that in TARG_DEC: {}, {}'.format(expected_dec, recorded_dec))
+    return recorded_ra, recorded_dec
 
-    assert np.isclose(float(hdu['TARG_RA']), expected_ra, rtol=0., atol=2.8e-7)
-    assert np.isclose(float(hdu['TARG_DEC']), expected_dec, rtol=0, atol=2.8e-7)
 
-    print("Pointing appears to be correct.")
+def check_ref_location_ra_dec(hdu, pointing_file):
+    """Confirm that the RA, Dec of the reference location in the observation
+    match the RA, Dec in the pointing file
+
+    Parameters
+    ----------
+    hdu : astropy.io.fits.header
+        Header to be checked. Should be extension 0 in JWST files
+
+    pointing_file : str
+        Name of ascii pointing file from APT
+
+    """
+
+    print('This actually may be kind of difficult. We need to match up the obs/visit/activity/exp numbers in the ')
+    print('file header to the correct entry in the pointing file, which works with slightly different parameters.')
+    print('Given that check_pointing_using_2mass_catalog should match up multiple sources within each field, this ')
+    print('function seems redundant. The only exception is if we have a subarray aperture with no catalog sources ')
+    print("in it. Let's punt on this for now.")
+    pass
+
+    apt = AptInput()
+    pointing = apt.get_pointing_info(pointing_file, propid=1068)
