@@ -41,7 +41,7 @@ def check_location(fullframe_file, subarray_file):
     hdulist = fits.HDUList([h0, h1])
     ff_base = fullframe_file.replace('.fits', '')
     sub_base = subarray_file.replace('.fits', '')
-    outname = 'location_comparison_{}_{}.fits'.format(sub_base, ff_base)
+    outname = 'location_comparison_full_frame_vs_{}_{}_{}.fits'.format(obj2.meta.subarray.name.upper(), sub_base, ff_base)
     hdulist.writeto(outname, overwrite=True)
     print('Subarray group and cropped full frame saved to {} for visual inspection.'.format(outname))
 
