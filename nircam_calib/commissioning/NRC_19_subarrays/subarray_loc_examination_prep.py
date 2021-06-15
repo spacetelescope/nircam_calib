@@ -15,6 +15,7 @@ on the detector, but the pixels actually read out started at (2, 2).
 from astropy.io import fits
 from jwst import datamodels
 import numpy as np
+import os
 import pysiaf
 
 
@@ -39,8 +40,8 @@ def check_location(fullframe_file, subarray_file):
     h0 = fits.PrimaryHDU(obj2.data[0, -1, :, :])
     h1 = fits.ImageHDU(cropped_ff[0, -1, :, :])
     hdulist = fits.HDUList([h0, h1])
-    ff_base = fullframe_file.replace('.fits', '')
-    sub_base = subarray_file.replace('.fits', '')
+    ff_base = os.path.basename(fullframe_file).replace('.fits', '')
+    sub_base = os.path.basename(subarray_file).replace('.fits', '')
     outname = 'location_comparison_full_frame_vs_{}_{}_{}.fits'.format(obj2.meta.subarray.name.upper(), sub_base, ff_base)
     hdulist.writeto(outname, overwrite=True)
     print('Subarray group and cropped full frame saved to {} for visual inspection.'.format(outname))
@@ -64,12 +65,20 @@ def get_siaf_aperture_name(mod):
     detector = mod.meta.instrument.detector.upper()
     filtername = mod.meta.instrument.filter.upper()
     if 'GRISM256' not in sub_name:
+        if sub_name == 'SUB32TATS':
+            sub_name = 'TAPSIMG32'
+        elif sub_name == 'SUB32TATSGRISM':
+            sub_name = 'TAGRISMTS_SCI_F322W2'
         siaf_aperture = '{}_{}'.format(detector, sub_name)
     else:
         if detector in ['NRCALONG', 'NRCA5']:
             siaf_aperture = '{}_GRISM256_{}'.format(detector, filtername)
         else:
             siaf_aperture = '{}_GRISMTS256'.format(detector)
+
+    if 'LONG' in siaf_aperture:
+        siaf_aperture = siaf_aperture.replace('LONG', '5')
+
     return siaf_aperture
 
 
