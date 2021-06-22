@@ -28,8 +28,10 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.io import ascii
 from jwst.datamodels import ImageModel
+from jwst import datamodels
 import numpy as np
 import os
+import pysiaf
 
 from mirage.apt.apt_inputs import AptInput
 
@@ -66,7 +68,7 @@ for point source files:
 
 """
 
-def check_pointing_target_star(filename, out_dir='./'):
+def check_pointing_target_star(filename, out_dir='./', threshold=50):
     """Check that the target star is present at the expected location in the image
 
     Parameters
@@ -79,24 +81,68 @@ def check_pointing_target_star(filename, out_dir='./'):
     out_dir : str
         Name of directory into which source catalogs are written
 
+    threshold : int
+        SNR threshold for star detection
+
     Returns
     -------
     min_delta : float
         Distance, in pixels, between the expected and measured locations of the
         target
     """
-    model = ImageModel(filename)
-    pix_scale = model.meta.wcsinfo.cdelt1 * 3600.
+    model = datamodels.open(filename)
+    pix_scale = model.meta.wcsinfo.cdelt1
+    if pix_scale is None:
+        pix_scale = model.meta.wcsinfo.cd1_1
+    pix_scale = np.abs(pix_scale) * 3600.
+
+    # Calculate the expected location of tbe target based on
+    # the SIAF and the dither information
+    detector = model.meta.instrument.detector
+    aperture = model.meta.subarray.name
+    if 'LONG' in detector:
+        detector = detector.replace('LONG', '5')
+    if 'GRISM256' not in aperture:
+        if aperture == 'SUB32TATS':
+            aperture = 'TAPSIMG32'
+        elif aperture == 'SUB32TATSGRISM':
+            aperture = 'TAGRISMTS_SCI_F322W2'
+        aperture_name = '{}_{}'.format(detector, aperture)
+    else:
+        if detector in ['NRCALONG', 'NRCA5']:
+            aperture_name = '{}_GRISM256_{}'.format(detector, 'F322W2')
+        else:
+            aperture_name = '{}_GRISMTS256'.format(detector)
+
+
+    #aperture_name = '{}_{}'.format(detector, aperture)
+    siaf = pysiaf.Siaf('nircam')[aperture_name]
+    xoffset = model.meta.dither.x_offset
+    yoffset = model.meta.dither.y_offset
+    xscale = siaf.XSciScale
+    yscale = siaf.YSciScale
+    xoffset_pix = xoffset / xscale
+    yoffset_pix = yoffset / yscale
+    siaf_loc = siaf.XSciRef - 1 + xoffset_pix, siaf.YSciRef - 1 + yoffset_pix
 
     # Calculate the pixel corresponding to the RA, Dec value of the star
     world2det = model.meta.wcs.get_transform('world', 'detector')
     star_x, star_y = world2det(STAR_RA, STAR_DEC)
 
     # Check to see if the star is actually there
-    sub_fwhm = get_fwhm(model.meta.instrument.filter)
+    if 'WL' not in model.meta.instrument.filter:
+        sub_fwhm = get_fwhm(model.meta.instrument.filter)
+    else:
+        # For weak lens data, set the FWHM to 2
+        sub_fwhm = 2.0
     plot_file = '{}_source_map.png'.format(os.path.basename(filename))
     plot_file = os.path.join(out_dir, plot_file)
-    found_sources = find_sources(model.data, threshold=50, fwhm=sub_fwhm, plot_name=plot_file)
+    found_sources = find_sources(model.data, threshold=threshold, fwhm=sub_fwhm, plot_name=plot_file)
+
+    # Calculate the distance from each source to the expected location
+    dx0 = found_sources['xcentroid'] - siaf_loc[0]
+    dy0 = found_sources['ycentroid'] - siaf_loc[1]
+    delta0 = np.sqrt(dx0**2 + dy0**2)
 
     # Calculate the distance from each source to the target
     dx = found_sources['xcentroid'] - star_x
@@ -105,6 +151,7 @@ def check_pointing_target_star(filename, out_dir='./'):
 
     # Add distances to the table and save
     found_sources['delta_from_target'] = delta
+    found_sources['delta_from_siaf_loc'] = delta0
     basename = os.path.basename(filename)
     table_out = os.path.join(out_dir, '{}_sources.txt'.format(basename))
     ascii.write(found_sources, table_out, overwrite=True)
@@ -113,17 +160,22 @@ def check_pointing_target_star(filename, out_dir='./'):
     # Closest source - assume this is our target star
     min_delta = np.nanmin(delta)
     print('Target expected location: ({0:1.2f}, {1:1.2f})'.format(star_x, star_y))
-    print(('{0}:\nDistance between calculated target location and measured target '
-           'location: {1:1.3f} pixels'.format(basename, min_delta)))
+    print(('{0}:\nDistance between calculated target location and measured location of '
+           'nearest source: {1:1.3f} pixels'.format(basename, min_delta)))
     full_err = np.sqrt(ra_err**2 + dec_err**2)
     print(('Uncertainty in the source location from 2MASS: RA: {}", Dec: {}", '
            'Total: {}"'.format(ra_err, dec_err, full_err)))
     print(('                                             = RA: {0:1.2f} pix, Dec: {1:1.2f} '
            'pix, Total: {2:1.2f} pix\n\n'.format(ra_err / pix_scale, dec_err / pix_scale, full_err / pix_scale)))
+
+    min_delta0 = np.nanmin(delta0)
+    print('Target expected location based on SIAF: ({0:1.2f}, {1:1.2f})'.format(siaf_loc[0], siaf_loc[1]))
+    print(('{0}:\nDistance between calculated target location and measured location of '
+           'nearest source: {1:1.3f} pixels'.format(basename, min_delta0)))
     return min_delta
 
 
-def check_pointing_using_2mass_catalog(filename, out_dir='./'):
+def check_pointing_using_2mass_catalog(filename, out_dir='./', threshold=50):
     """Check that stars from an external 2MASS catalog are present at the expected
     locations within filename.
 
@@ -136,6 +188,9 @@ def check_pointing_using_2mass_catalog(filename, out_dir='./'):
 
     out_dir : str
         Name of directory into which source catalogs are written
+
+    threshold : int
+        SNR threshold to use when finding sources
 
     Returns
     -------
@@ -155,7 +210,10 @@ def check_pointing_using_2mass_catalog(filename, out_dir='./'):
     """
     print("Working on: {}".format(os.path.basename(filename)))
     model = ImageModel(filename)
-    pix_scale = model.meta.wcsinfo.cdelt1 * 3600.
+    pix_scale = model.meta.wcsinfo.cdelt1
+    if pix_scale is None:
+        pix_scale = model.meta.wcsinfo.cd1_1
+    pix_scale = np.abs(pix_scale) * 3600.
 
     # Read in catalog from 2MASS. We'll be using the positions in this
     # catalog as "truth"
@@ -184,10 +242,14 @@ def check_pointing_using_2mass_catalog(filename, out_dir='./'):
     cat_2mass = cat_2mass[good]
 
     # Find sources in the data
-    sub_fwhm = get_fwhm(model.meta.instrument.filter)
+    if 'WL' not in model.meta.instrument.filter:
+        sub_fwhm = get_fwhm(model.meta.instrument.filter)
+    else:
+        # For weak lens data, set the FWHM to 2
+        sub_fwhm = 2.0
     plot_file = '{}_source_map.png'.format(os.path.basename(filename))
     plot_file = os.path.join(out_dir, plot_file)
-    sources = find_sources(model.data, threshold=50, fwhm=sub_fwhm, plot_name=plot_file)
+    sources = find_sources(model.data, threshold=threshold, fwhm=sub_fwhm, plot_name=plot_file)
 
     # Calculate RA, Dec of the sources in the new catalog
     det2world = model.meta.wcs.get_transform('detector', 'world')
