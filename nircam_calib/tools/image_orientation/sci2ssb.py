@@ -143,8 +143,8 @@ class sci2ssbclass(nircam2ssbclass):
             self.outputmodel.meta.subarray.slowaxis = 2
             if ncols == 2048 and nrows == 2048:
                 xstrt = 1
-                ystrt = 2048
-                xend = 1
+                ystrt = 1
+                xend = 2048
                 yend = 2048
             else:
                 xstrt = int(2048 - self.hdr['COLCORNR'])
@@ -180,7 +180,7 @@ class sci2ssbclass(nircam2ssbclass):
 
 
         #  Update the subarray parameters
-        print('trying to get the subarray name')        
+        print('trying to get the subarray name')
         subarray_name = self.get_subarray_name(subarrays,self.hdr['DETECTOR'],self.hdr['COLCORNR'], self.hdr['ROWCORNR'])
         self.outputmodel.meta.subarray.name = subarray_name
 
