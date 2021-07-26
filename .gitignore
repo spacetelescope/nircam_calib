@@ -4,3 +4,5 @@
 *dsub2
 *dsubij
 *_uncal.dsub12.all.*
+.ipynb_checkpoints/
+nircam_calib/commissioning/NRC_33_grismTS_stability/pipe_process/*/*.fits
