@@ -54,11 +54,48 @@ from photutils import CircularAperture, CircularAnnulus
 from nircam_calib.commissioning.utils.photometry import find_sources, get_fwhm
 
 
-def compare_level3_catalogs(cat_file_1, cat_file_2, output_name, out_dir='./'):
-    """MAIN FUNCTION"""
+def compare_level3_catalogs(cat_file_1, cat_file_2, output_name, out_dir='./', max_match_thresh=0.06,
+                            ee_perc=70, limiting_vegamag=20.):
+    """MAIN FUNCTION
+    Compare source fluxes in level 3 catalogs
+
+    Parameters
+    ----------
+    cat_file_1 : str
+        Catalog name
+
+    cat_file_2 : str
+        Catalog name
+
+    output_name : str
+        Name of ascii file for outputs
+
+    out_dir : str
+        Directory to write the output file into
+
+    max_match_thresh : float
+        Maximum distance in arcsec that will constitute a match when matching sources between the two catalogs
+
+    ee_perc : int
+        Encircled energy percentage to use for the comparison. The default ee percentages used
+        by the pipeline are 30%, 50%, and 70%
+
+    limiting_vegamag : float
+        Maximum vegamag (dimmest source) to consider when comparing catalogs
+    """
+    print('Comparing: {} and {}'.format(os.path.basename(cat_file_1), os.path.basename(cat_file_2)))
     # Read in catalogs
     cat1 = ascii.read(cat_file_1)
     cat2 = ascii.read(cat_file_2)
+
+    # Remove sources that are dimmer than the magnitude threshold
+    good1 = cat1['aper{}_vegamag'.format(ee_perc)] < limiting_vegamag
+    cat1 = cat1[good1]
+    print('Removing sources that are too dim. Keeping {} sources in {}'.format(len(cat1), cat_file_1))
+
+    good2 = cat2['aper{}_vegamag'.format(ee_perc)] < limiting_vegamag
+    cat2 = cat2[good2]
+    print('Removing sources that are too dim. Keeping {} sources in {}'.format(len(cat2), cat_file_2))
 
     # Create output catalog and lists for results
     output_cat = Table()
@@ -77,27 +114,28 @@ def compare_level3_catalogs(cat_file_1, cat_file_2, output_name, out_dir='./'):
     idx, d2d, d3d = cat1['sky_centroid'].match_to_catalog_sky(cat2['sky_centroid'])
 
     # Remove bad matches
-    max_sep = 0.06 * u.arcsec  # Match 1 LW pix or 2 SW pix
+    max_sep = max_match_thresh * u.arcsec  # Match 1 LW pix or 2 SW pix
     sep_constraint = d2d < max_sep
     catalog_1_matches = cat1[sep_constraint]
     catalog_2_matches = cat2[idx[sep_constraint]]
     print('Found {} matching sources.'.format(len(catalog_2_matches)))
 
-    delta_flux = catalog_2_matches['aper30_flux'] - catalog_1_matches['aper30_flux']
-    delta_flux_perc = delta_flux / catalog_2_matches['aper30_flux'] * 100.
-    delta_mag = catalog_2_matches['aper30_abmag'] - catalog_1_matches['aper30_abmag']
-    flux_err = np.sqrt(catalog_2_matches['aper30_flux_err']**2 + catalog_2_matches['aper30_flux_err']**2)
+    aperstr = 'aper{}'.format(ee_perc)
+    delta_flux = catalog_2_matches['{}_flux'.format(aperstr)] - catalog_1_matches['{}_flux'.format(aperstr)]
+    delta_flux_perc = delta_flux / catalog_2_matches['{}_flux'.format(aperstr)] * 100.
+    delta_mag = catalog_2_matches['{}_abmag'.format(aperstr)] - catalog_1_matches['{}_abmag'.format(aperstr)]
+    flux_err = np.sqrt(catalog_2_matches['{}_flux_err'.format(aperstr)]**2 + catalog_2_matches['{}_flux_err'.format(aperstr)]**2)
 
     output_cat['cat1_pos'] = catalog_1_matches['sky_centroid']
-    output_cat['cat1_flux'] = catalog_1_matches['aper30_flux']
-    output_cat['cat1_fluxerr'] = catalog_1_matches['aper30_flux_err']
-    output_cat['cat1_mag'] = catalog_1_matches['aper30_abmag']
-    output_cat['cat1_magerr'] = catalog_1_matches['aper30_abmag_err']
+    output_cat['cat1_flux'] = catalog_1_matches['{}_flux'.format(aperstr)]
+    output_cat['cat1_fluxerr'] = catalog_1_matches['{}_flux_err'.format(aperstr)]
+    output_cat['cat1_mag'] = catalog_1_matches['{}_abmag'.format(aperstr)]
+    output_cat['cat1_magerr'] = catalog_1_matches['{}_abmag_err'.format(aperstr)]
     output_cat['cat2_pos'] = catalog_2_matches['sky_centroid']
-    output_cat['cat2_flux'] = catalog_2_matches['aper30_flux']
-    output_cat['cat2_fluxerr'] = catalog_2_matches['aper30_flux_err']
-    output_cat['cat2_mag'] = catalog_2_matches['aper30_abmag']
-    output_cat['cat2_magerr'] = catalog_2_matches['aper30_abmag_err']
+    output_cat['cat2_flux'] = catalog_2_matches['{}_flux'.format(aperstr)]
+    output_cat['cat2_fluxerr'] = catalog_2_matches['{}_flux_err'.format(aperstr)]
+    output_cat['cat2_mag'] = catalog_2_matches['{}_abmag'.format(aperstr)]
+    output_cat['cat2_magerr'] = catalog_2_matches['{}_abmag_err'.format(aperstr)]
     output_cat['delta_flux'] = delta_flux
     output_cat['delta_flux_perc'] = delta_flux_perc
     output_cat['delta_mag'] = delta_mag
@@ -105,11 +143,13 @@ def compare_level3_catalogs(cat_file_1, cat_file_2, output_name, out_dir='./'):
     output_cat.meta['comments'] = ['cat1 = {}'.format(cat_file_1), 'cat2 = {}'.format(cat_file_2)]
     ascii.write(output_cat, os.path.join(out_dir, output_name), overwrite=True)
 
-    print(output_cat['cat1_pos', 'cat1_flux', 'cat2_flux', 'delta_flux', 'delta_flux_perc'])
+    #print(output_cat['cat1_pos', 'cat1_flux', 'cat2_flux', 'delta_flux', 'delta_flux_perc'])
 
-    print("Median and stdev percentage flux difference between the matched sources in the two catalogs: ")
-    perc = delta_flux / catalog_2_matches['aper30_flux'] * 100.
-    print(np.median(perc), np.std(perc))
+    #print("Median and stdev percentage flux difference between the matched sources in the two catalogs: ")
+    perc = delta_flux / catalog_2_matches['{}_flux'.format(aperstr)] * 100.
+    print("Median percentage flux difference between matched sources: {:.2f}%".format(np.median(perc)))
+    print('Stdev of percentage flux differences between matched sources: {:.2f}%'.format(np.std(perc)))
+    print('See {} for the list of matched sources\n\n'.format(os.path.join(out_dir, output_name)))
     return output_cat
 
 
@@ -191,7 +231,7 @@ def compare_rate_images(subarray_file, fullframe_file, out_dir='./'):
     num_matched = len(ff_catalog_matches)
     print('Found {} matching sources.'.format(num_matched))
     if num_matched == 0:
-        print("No matching sources found. Quitting.")
+        print("No matching sources found. Quitting.\n\n\n")
         return 0, 0
 
     # What if we just do photometry on the sources in the subarray and their
@@ -238,8 +278,8 @@ def compare_rate_images(subarray_file, fullframe_file, out_dir='./'):
     #ff_pos = [(m['xcentroid'], m['ycentroid']) for m in ff_catalog_matches]
 
 
-    sub_aperture = CircularAperture(sub_pos, r=3.)
-    ff_aperture = CircularAperture(ff_pos, r=3.)
+    sub_aperture = CircularAperture(sub_pos, r=5.)
+    ff_aperture = CircularAperture(ff_pos, r=5.)
     sub_annulus = CircularAnnulus(sub_pos, r_in=10, r_out=15)
     full_annulus = CircularAnnulus(ff_pos, r_in=10, r_out=15)
 

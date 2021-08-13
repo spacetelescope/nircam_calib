@@ -27,6 +27,9 @@ that RA, Dec correspond to the reference location (+dither)
 from astropy import units as u
 from astropy.coordinates import SkyCoord
 from astropy.io import ascii
+from astropy.table import Table
+from astroquery.gaia import Gaia
+from collections import OrderedDict
 from jwst.datamodels import ImageModel
 from jwst import datamodels
 import numpy as np
@@ -90,6 +93,7 @@ def check_pointing_target_star(filename, out_dir='./', threshold=50):
         Distance, in pixels, between the expected and measured locations of the
         target
     """
+    print('Working on: {}...'.format(filename))
     model = datamodels.open(filename)
     pix_scale = model.meta.wcsinfo.cdelt1
     if pix_scale is None:
@@ -117,17 +121,30 @@ def check_pointing_target_star(filename, out_dir='./', threshold=50):
 
     #aperture_name = '{}_{}'.format(detector, aperture)
     siaf = pysiaf.Siaf('nircam')[aperture_name]
-    xoffset = model.meta.dither.x_offset
-    yoffset = model.meta.dither.y_offset
-    xscale = siaf.XSciScale
-    yscale = siaf.YSciScale
-    xoffset_pix = xoffset / xscale
-    yoffset_pix = yoffset / yscale
-    siaf_loc = siaf.XSciRef - 1 + xoffset_pix, siaf.YSciRef - 1 + yoffset_pix
+    xoffset = model.meta.dither.x_offset  # Units here are arcsec in ideal coord sys
+    yoffset = model.meta.dither.y_offset  # Units here are arcsec in ideal coord sys
+    #xscale = siaf.XSciScale
+    #yscale = siaf.YSciScale
+    #xoffset_pix = xoffset / xscale
+    #yoffset_pix = yoffset / yscale
+    #siaf_loc = siaf.XSciRef - 1 + xoffset_pix, siaf.YSciRef - 1 + yoffset_pix
+    # The line below means that we are assuming the target should be at the
+    # reference location, modified only by the x_offset, y_offset
+    siaf_1index_loc = siaf.idl_to_sci(xoffset, yoffset)
+    siaf_loc = (siaf_1index_loc[0] - 1, siaf_1index_loc[1] - 1)
 
     # Calculate the pixel corresponding to the RA, Dec value of the star
     world2det = model.meta.wcs.get_transform('world', 'detector')
     star_x, star_y = world2det(STAR_RA, STAR_DEC)
+
+    # If the source is not expected to be on the detector
+    # e.g. in one of the two SW images that accompany the grismTS observation,
+    # then return None
+    data_shape = model.data.shape[-2:]
+    if ((star_x < 0) or (star_y < 0) or (star_x > data_shape[1]) or (star_y > data_shape[0])):
+        print('\nTarget expected location (using GWCS): ({0:1.2f}, {1:1.2f})'.format(star_x, star_y))
+        print('Source not expected to fall within this aperture.\n\n')
+        return None
 
     # Check to see if the star is actually there
     if 'WL' not in model.meta.instrument.filter:
@@ -150,7 +167,7 @@ def check_pointing_target_star(filename, out_dir='./', threshold=50):
     delta = np.sqrt(dx**2 + dy**2)
 
     # Add distances to the table and save
-    found_sources['delta_from_target'] = delta
+    found_sources['delta_from_gwcs_loc'] = delta
     found_sources['delta_from_siaf_loc'] = delta0
     basename = os.path.basename(filename)
     table_out = os.path.join(out_dir, '{}_sources.txt'.format(basename))
@@ -159,7 +176,7 @@ def check_pointing_target_star(filename, out_dir='./', threshold=50):
 
     # Closest source - assume this is our target star
     min_delta = np.nanmin(delta)
-    print('Target expected location: ({0:1.2f}, {1:1.2f})'.format(star_x, star_y))
+    print('\nTarget expected location (using GWCS): ({0:1.2f}, {1:1.2f})'.format(star_x, star_y))
     print(('{0}:\nDistance between calculated target location and measured location of '
            'nearest source: {1:1.3f} pixels'.format(basename, min_delta)))
     full_err = np.sqrt(ra_err**2 + dec_err**2)
@@ -169,14 +186,14 @@ def check_pointing_target_star(filename, out_dir='./', threshold=50):
            'pix, Total: {2:1.2f} pix\n\n'.format(ra_err / pix_scale, dec_err / pix_scale, full_err / pix_scale)))
 
     min_delta0 = np.nanmin(delta0)
-    print('Target expected location based on SIAF: ({0:1.2f}, {1:1.2f})'.format(siaf_loc[0], siaf_loc[1]))
+    print('Target expected location based on SIAF and x,y_offset: ({0:1.2f}, {1:1.2f})'.format(siaf_loc[0], siaf_loc[1]))
     print(('{0}:\nDistance between calculated target location and measured location of '
-           'nearest source: {1:1.3f} pixels'.format(basename, min_delta0)))
+           'nearest source: {1:1.3f} pixels\n\n\n'.format(basename, min_delta0)))
     return min_delta
 
 
-def check_pointing_using_2mass_catalog(filename, out_dir='./', threshold=50):
-    """Check that stars from an external 2MASS catalog are present at the expected
+def check_pointing_using_lmc_catalog(filename, out_dir='./', threshold=50):
+    """Check that stars from an external LMC source catalog are present at the expected
     locations within filename.
 
     Parameters
@@ -217,10 +234,29 @@ def check_pointing_using_2mass_catalog(filename, out_dir='./', threshold=50):
 
     # Read in catalog from 2MASS. We'll be using the positions in this
     # catalog as "truth"
-    catalog_2mass = os.path.join(os.path.dirname(__file__), 'car19_2MASS_source_catalog.txt')
-    cat_2mass = ascii.read(catalog_2mass)
-    ra_unc = cat_2mass['err_maj'] * u.arcsec
-    dec_unc = cat_2mass['err_min'] * u.arcsec
+    #catalog_2mass = os.path.join(os.path.dirname(__file__), 'car19_2MASS_source_catalog.txt')
+    #cat_2mass = ascii.read(catalog_2mass)
+    #ra_unc = cat_2mass['err_maj'] * u.arcsec
+    #dec_unc = cat_2mass['err_min'] * u.arcsec
+    #total_unc = np.sqrt(ra_unc**2 + dec_unc**2)
+
+    #pix2world = model.meta.wcs.get_transform('detector', 'world')
+    #ra, dec = pix2world(model.meta.subarray.xsize/2, model.meta.subarray.ysize/2)
+    #box_width = max(model.meta.subarray.xsize, model.meta.subarray.ysize) * model.meta.wcsinfo.cdelt1 * 3600 * 1.5
+    #print('RA, Dec, Box width', ra, dec, box_width)
+
+    # Try GAIA catalog instead
+    # Blah. Still no sources in some apertures
+    #gaia = query_GAIA_ptsrc_catalog(ra, dec, box_width)
+    #cat_2mass = gaia[0]
+
+    # Try LMC catalog from Jay Anderson
+    cat = ascii.read('lmc_astrometric_field_mirage.cat')
+    cat_2mass = Table()
+    cat_2mass['ra'] = cat['x_or_RA']
+    cat_2mass['dec'] = cat['y_or_Dec']
+    ra_unc = [0.0] * len(cat_2mass['ra']) * u.arcsec  # No uncertainties in Jay's cat
+    dec_unc = [0.0] * len(cat_2mass['ra']) * u.arcsec  # No uncertainties in Jay's cat
     total_unc = np.sqrt(ra_unc**2 + dec_unc**2)
 
     # Calculate the pixel corresponding to the RA, Dec value of the stars
@@ -233,7 +269,7 @@ def check_pointing_using_2mass_catalog(filename, out_dir='./', threshold=50):
     # Remove stars that are not on the detector
     ydim, xdim = model.data.shape
     good = ((star_x > 0) & (star_x < xdim) & (star_y > 0) & (star_y < ydim))
-    print('{} 2MASS sources should be present on the detector.'.format(np.sum(good)))
+    print('{} LMC sources should be present on the detector.'.format(np.sum(good)))
 
     if np.sum(good) == 0:
         print('Skipping.\n')
@@ -260,24 +296,24 @@ def check_pointing_using_2mass_catalog(filename, out_dir='./', threshold=50):
     # Match catalogs
     found_sources = SkyCoord(ra=found_ra * u.degree, dec=found_dec * u.degree)
     from_2mass = SkyCoord(ra=cat_2mass['ra'] * u.degree, dec=cat_2mass['dec'] * u.degree)
-    idx, d2d, d3d = from_2mass.match_to_catalog_3d(found_sources)
+    idx, d2d, d3d = found_sources.match_to_catalog_3d(from_2mass)
 
     # Print table of sources
     d2d_arcsec = d2d.to(u.arcsec).value
-    cat_2mass['image_x'] = sources[idx]['xcentroid']
-    cat_2mass['image_y'] = sources[idx]['ycentroid']
-    cat_2mass['image_ra'] = sources[idx]['calc_RA']
-    cat_2mass['image_dec'] = sources[idx]['calc_Dec']
-    cat_2mass['delta_sky'] = d2d_arcsec
-    cat_2mass['delta_pix'] = d2d_arcsec / pix_scale
+    sources['x_of_matched_source'] = cat_2mass[idx]['x']
+    sources['y_of_matched_source'] = cat_2mass[idx]['y']
+    sources['ra_of_matched_source'] = cat_2mass[idx]['ra']
+    sources['dec_of_matched_source'] = cat_2mass[idx]['dec']
+    sources['delta_sky'] = d2d_arcsec
+    sources['delta_pix'] = d2d_arcsec / pix_scale
 
-    for colname in ['x', 'y', 'image_x', 'image_y', 'delta_pix']:
-        cat_2mass[colname].info.format = '7.3f'
+    for colname in ['xcentroid', 'ycentroid', 'x_of_matched_source', 'y_of_matched_source', 'delta_pix']:
+        sources[colname].info.format = '7.3f'
 
-    print(cat_2mass['x', 'y', 'image_x', 'image_y', 'delta_pix'])
+    print(sources['xcentroid', 'ycentroid', 'x_of_matched_source', 'y_of_matched_source', 'delta_pix'])
 
     # Save the table of sources
-    table_file = 'comp_found_sources_to_2MASS_{}.txt'.format(os.path.basename(filename))
+    table_file = 'comp_found_sources_to_LMC_{}.txt'.format(os.path.basename(filename))
     table_file = os.path.join(out_dir, table_file)
     print('Table of source location comparison saved to: {}'.format(table_file))
     ascii.write(cat_2mass, table_file, overwrite=True)
@@ -285,13 +321,13 @@ def check_pointing_using_2mass_catalog(filename, out_dir='./', threshold=50):
     # Get info on median offsets
     med_dist = np.nanmedian(d2d_arcsec)
     dev_dist = np.nanstd(d2d_arcsec)
-    print(("Median distance between sources in 2MASS catalog and those found in the "
-           "data: {0:1.2f} arcsec = {1:1.2f} pixels".format(med_dist, med_dist / pix_scale)))
+    print(("Median distance between sources in LMC catalog and those found in the "
+           "data: {0:1.4f} arcsec = {1:1.2f} pixels\n\n".format(med_dist, med_dist / pix_scale)))
 
     mean_unc = np.mean(total_unc)
     mean_unc_pix = np.mean(total_unc.value) / pix_scale
-    print(("Mean uncertainty in the source locations within the 2MASS catalog: {0:1.2f} = {1:1.2f} "
-           "pixels\n\n".format(mean_unc, mean_unc_pix)))
+    #print(("Mean uncertainty in the source locations within the LMC catalog: {0:1.4f} = {1:1.2f} "
+    #       "pixels\n\n".format(mean_unc, mean_unc_pix)))
     return med_dist, dev_dist, mean_unc, d2d_arcsec
 
 
@@ -355,3 +391,92 @@ def check_ref_location_ra_dec(hdu, pointing_file):
 
     apt = AptInput()
     pointing = apt.get_pointing_info(pointing_file, propid=1068)
+
+
+def query_GAIA_ptsrc_catalog(ra, dec, box_width):
+    """
+    This code is adapted from gaia_crossreference.py by Johannes Sahlmann.  It
+    queries the GAIA DR2 archive for sources within a given square region of
+    the sky and rerurns the catalogue along with the 2MASS and WISE
+    cross-references for use in combining the catalogues to get the infrared
+    magnitudes for the sources that are detected in the other telescopes.
+    The GAIA main table has all the GAIA values, but the other tables have only
+    specific subsets of the data values to save space.  In the "crossref"
+    tables the 'designation' is the GAIA name while 'designation_2' is the
+    2MASS or WISE name.
+    Parameters
+    ----------
+    ra : float
+        Right ascension of the target field in degrees
+    dec : float
+        Declination of the target field in degrees
+    box_width : float
+        Width of the (square) sky area, in arc-seconds
+    Returns
+    -------
+    gaia_cat : astropy.table.Table
+        The gaia DR2 magnitudes and other data
+    gaia_mag_cols : list
+        List of the GAIA magnitude column names
+    gaia_2mass : astropy.table.Table
+        The 2MASS values as returned from the GAIA archive
+    gaia_2mass_crossref : astropy.table.Table
+        The cross-reference list with 2MASS sources
+    gaia_wise : astropy.table.Table
+        The WISE values as returned from the GAIA archive
+    gaia_wise_crossref : astropy.table.Table
+        The cross-reference list with WISE sources
+    """
+    data = OrderedDict()
+    data['gaia'] = OrderedDict()
+    data['tmass'] = OrderedDict()
+    data['wise'] = OrderedDict()
+    data['tmass_crossmatch'] = OrderedDict()
+    data['wise_crossmatch'] = OrderedDict()
+    # convert box width to degrees for the GAIA query
+    boxwidth = box_width/3600.
+    data['gaia']['query'] = """SELECT * FROM gaiadr2.gaia_source AS gaia
+                        WHERE 1=CONTAINS(POINT('ICRS',gaia.ra,gaia.dec), BOX('ICRS',{}, {}, {}, {}))
+                        """.format(ra, dec, boxwidth, boxwidth)
+
+    data['tmass']['query'] = """SELECT ra,dec,ph_qual,j_m,h_m,ks_m,designation FROM gaiadr1.tmass_original_valid AS tmass
+                        WHERE 1=CONTAINS(POINT('ICRS',tmass.ra,tmass.dec), BOX('ICRS',{}, {}, {}, {}))
+                        """.format(ra, dec, boxwidth, boxwidth)
+
+    data['tmass_crossmatch']['query'] = """SELECT field.ra,field.dec,field.designation,tmass.designation from
+            (SELECT gaia.*
+            FROM gaiadr2.gaia_source AS gaia
+            WHERE 1=CONTAINS(POINT('ICRS',gaia.ra,gaia.dec), BOX('ICRS',{}, {}, {}, {})))
+            AS field
+            INNER JOIN gaiadr2.tmass_best_neighbour AS xmatch
+                ON field.source_id = xmatch.source_id
+            INNER JOIN gaiadr1.tmass_original_valid AS tmass
+                ON tmass.tmass_oid = xmatch.tmass_oid
+        """.format(ra, dec, boxwidth, boxwidth)
+
+    data['wise']['query'] = """SELECT ra,dec,ph_qual,w1mpro,w2mpro,w3mpro,w4mpro,designation FROM gaiadr1.allwise_original_valid AS wise
+                        WHERE 1=CONTAINS(POINT('ICRS',wise.ra,wise.dec), BOX('ICRS',{}, {}, {}, {}))
+                        """.format(ra, dec, boxwidth, boxwidth)
+
+    data['wise_crossmatch']['query'] = """SELECT field.ra,field.dec,field.designation,allwise.designation from
+            (SELECT gaia.*
+            FROM gaiadr2.gaia_source AS gaia
+            WHERE 1=CONTAINS(POINT('ICRS',gaia.ra,gaia.dec), BOX('ICRS',{}, {}, {}, {})))
+            AS field
+            INNER JOIN gaiadr2.allwise_best_neighbour AS xmatch
+                ON field.source_id = xmatch.source_id
+            INNER JOIN gaiadr1.allwise_original_valid AS allwise
+                ON allwise.designation = xmatch.original_ext_source_id
+        """.format(ra, dec, boxwidth, boxwidth)
+
+    outvalues = {}
+    print('Searching the GAIA DR2 catalog')
+    for key in data.keys():
+        job = Gaia.launch_job_async(data[key]['query'], dump_to_file=False)
+        table = job.get_results()
+        outvalues[key] = table
+        print('Retrieved {} sources for catalog {}'.format(len(table), key))
+    gaia_mag_cols = ['phot_g_mean_mag', 'phot_bp_mean_mag', 'phot_rp_mean_mag']
+    return outvalues['gaia'], gaia_mag_cols, outvalues['tmass'], outvalues['tmass_crossmatch'], outvalues['wise'], outvalues['wise_crossmatch']
+
+
