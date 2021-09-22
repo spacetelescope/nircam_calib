@@ -3,12 +3,17 @@
 """This module contains functions related to photometry that may be generally
 useful to analysis of multiple CARs
 """
-from astropy.stats import sigma_clipped_stats
+from astropy.convolution import Gaussian2DKernel
+from astropy.stats import sigma_clipped_stats, gaussian_fwhm_to_sigma
 from astropy.visualization import SqrtStretch
 from astropy.visualization.mpl_normalize import ImageNormalize
 import matplotlib.pyplot as plt
 import numpy as np
-from photutils import CircularAnnulus, CircularAperture, DAOStarFinder, aperture_photometry
+from photutils import CircularAnnulus, CircularAperture, DAOStarFinder, \
+                      aperture_photometry, source_properties
+from photutils.background import Background2D, MedianBackground
+from photutils.segmentation import detect_threshold, detect_sources, deblend_sources, SourceCatalog
+from photutils.utils import calc_total_error
 
 
 def do_photometry(image, source_table, aperture_radius=3, subtract_background=False, annulus_radii=(6, 8)):
@@ -113,6 +118,47 @@ def find_sources(data, threshold=30, fwhm=3.0, show_sources=True, save_sources=F
     return sources
 
 
+def find_sources_via_segmentation(data, sigma=3, fwhm=2.0, min_pix=5, make_plot=False):
+    """
+    """
+    yd, xd = data.shape
+
+    # Let's define the background using boxes of ~50x50 pixels
+    nboxx = int(xd / 150)
+    nboxy = int(yd / 150)
+    bkg_estimator = MedianBackground()
+    bkg = Background2D(data, (nboxy, nboxx), filter_size=(3, 3),
+                       bkg_estimator=bkg_estimator)
+
+    data -= bkg.background  # subtract the background
+    threshold = sigma * bkg.background_rms
+
+    #threshold = detect_threshold(data, nsigma=sigma)
+
+    gaussian_sigma = fwhm * gaussian_fwhm_to_sigma
+    kernel = Gaussian2DKernel(gaussian_sigma, x_size=3, y_size=3)
+    kernel.normalize(mode='integral')
+    segm = detect_sources(data, threshold, npixels=min_pix, filter_kernel=kernel)
+    segm_deblend = deblend_sources(data, segm, npixels=min_pix,
+                                   filter_kernel=kernel, nlevels=32,
+                                   contrast=0.001)
+
+    if make_plot:
+        norm = ImageNormalize(stretch=SqrtStretch())
+        fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 12.5))
+        ax1.imshow(data, origin='lower', cmap='Greys_r', norm=norm)
+        ax1.set_title('Data')
+        cmap = segm.make_cmap(seed=123)
+        ax2.imshow(segm, origin='lower', cmap=cmap, interpolation='nearest')
+        ax2.set_title('Segmentation Image')
+        ax3.imshow(segm_deblend, origin='lower', cmap=cmap, interpolation='nearest')
+        ax3.set_title('Deblended Segmentation Image')
+        plt.show()
+        #plt.save('testing.jpg')
+
+    return data, segm_deblend, bkg
+
+
 def fwhm(wavelength):
     """Calculate the approximate FWHM, in arcsec, for a given wavelength.
     This equation was calculated by hand using approximate values for the
@@ -156,3 +202,37 @@ def get_fwhm(filter_name):
     else:
         pix_scale = 0.062  # arcsec/pixel
     return fwhm_arcsec / pix_scale
+
+
+def photometry_via_segmentation_image(data, seg_image, background_image, effective_gain, wcs=None):
+    """
+    """
+    error = calc_total_error(data, background_image.background_rms, effective_gain)
+    cat = SourceCatalog(data, seg_image, background=background_image.background, error=error, apermask_method='mask', wcs=wcs)
+
+    columns = ['area', 'background_mean', 'sky_centroid', 'cxx', 'cxy', 'cyy', 'ellipticity', 'fwhm',
+               'local_background', 'xcentroid', 'ycentroid', 'kron_flux', 'kron_fluxerr', 'segment_flux', 'segment_fluxerr']
+
+    tbl = cat.to_table(columns=columns)
+    for colname in columns:
+        if colname != 'sky_centroid':
+            tbl[colname].info.format = '.4f'
+    #tbl['xcentroid'].info.format = '.4f'  # optional format
+    #tbl['ycentroid'].info.format = '.4f'
+    #tbl['kron_flux'].info.format = '.4f'
+    print(tbl)
+
+
+    # Make background image
+
+
+
+
+    #props = source_properties(data, seg_image, background=background_image.background)
+    #tbl = properties_table(props)
+    #print(tbl)
+
+    #columns = ['id', 'background_at_centroid', 'background_mean',
+    #           'background_sum']
+    #tbl = properties_table(props, columns=columns)
+    #print(tbl)

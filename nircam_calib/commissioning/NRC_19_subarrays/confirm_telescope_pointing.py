@@ -156,6 +156,8 @@ def check_pointing_target_star(filename, out_dir='./', threshold=50):
     plot_file = os.path.join(out_dir, plot_file)
     found_sources = find_sources(model.data, threshold=threshold, fwhm=sub_fwhm, plot_name=plot_file)
 
+    print(found_sources['id', 'xcentroid', 'ycentroid', 'flux'])
+
     # Calculate the distance from each source to the expected location
     dx0 = found_sources['xcentroid'] - siaf_loc[0]
     dy0 = found_sources['ycentroid'] - siaf_loc[1]
@@ -176,19 +178,22 @@ def check_pointing_target_star(filename, out_dir='./', threshold=50):
 
     # Closest source - assume this is our target star
     min_delta = np.nanmin(delta)
-    print('\nTarget expected location (using GWCS): ({0:1.2f}, {1:1.2f})'.format(star_x, star_y))
-    print(('{0}:\nDistance between calculated target location and measured location of '
-           'nearest source: {1:1.3f} pixels'.format(basename, min_delta)))
-    full_err = np.sqrt(ra_err**2 + dec_err**2)
-    print(('Uncertainty in the source location from 2MASS: RA: {}", Dec: {}", '
-           'Total: {}"'.format(ra_err, dec_err, full_err)))
-    print(('                                             = RA: {0:1.2f} pix, Dec: {1:1.2f} '
-           'pix, Total: {2:1.2f} pix\n\n'.format(ra_err / pix_scale, dec_err / pix_scale, full_err / pix_scale)))
+    closest_gwcs = found_sources['delta_from_gwcs_loc'] == min_delta
+    closest_x_gwcs = found_sources['xcentroid'][closest_gwcs].data[0]
+    closest_y_gwcs = found_sources['ycentroid'][closest_gwcs].data[0]
 
     min_delta0 = np.nanmin(delta0)
-    print('Target expected location based on SIAF and x,y_offset: ({0:1.2f}, {1:1.2f})'.format(siaf_loc[0], siaf_loc[1]))
-    print(('{0}:\nDistance between calculated target location and measured location of '
-           'nearest source: {1:1.3f} pixels\n\n\n'.format(basename, min_delta0)))
+    closest_siaf = found_sources['delta_from_siaf_loc'] == min_delta0
+    closest_x_siaf = found_sources['xcentroid'][closest_siaf].data[0]
+    closest_y_siaf = found_sources['ycentroid'][closest_siaf].data[0]
+
+    print('\nTarget expected location (using GWCS): ({0:1.2f}, {1:1.2f})'.format(star_x, star_y))
+    print('Location of closest source: ({0:1.2f}, {1:1.2f})'.format(closest_x_gwcs, closest_y_gwcs))
+    print('Difference: {0:1.2f} pixels\n'.format(min_delta))
+
+    print('Target expected location (based on SIAF and x,y_offset): ({0:1.2f}, {1:1.2f})'.format(siaf_loc[0], siaf_loc[1]))
+    print('Location of closest source: ({0:1.2f}, {1:1.2f})'.format(closest_x_siaf, closest_y_siaf))
+    print(('Difference: {0:1.2f} pixels\n\n\n'.format(min_delta0)))
     return min_delta
 
 

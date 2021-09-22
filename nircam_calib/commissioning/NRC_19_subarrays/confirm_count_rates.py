@@ -92,10 +92,16 @@ def compare_level3_catalogs(cat_file_1, cat_file_2, output_name, out_dir='./', m
     good1 = cat1['aper{}_vegamag'.format(ee_perc)] < limiting_vegamag
     cat1 = cat1[good1]
     print('Removing sources that are too dim. Keeping {} sources in {}'.format(len(cat1), cat_file_1))
+    if len(good1) == 0:
+        print('No sources in {} meet the brightness threshold. Quitting.\n\n'.format(cat_file_1))
+        return None
 
     good2 = cat2['aper{}_vegamag'.format(ee_perc)] < limiting_vegamag
     cat2 = cat2[good2]
     print('Removing sources that are too dim. Keeping {} sources in {}'.format(len(cat2), cat_file_2))
+    if len(good2) == 0:
+        print('No sources in {} meet the brightness threshold. Quitting.\n\n'.format(cat_file_2))
+        return None
 
     # Create output catalog and lists for results
     output_cat = Table()
@@ -153,7 +159,8 @@ def compare_level3_catalogs(cat_file_1, cat_file_2, output_name, out_dir='./', m
     return output_cat
 
 
-def compare_rate_images(subarray_file, fullframe_file, out_dir='./'):
+def compare_rate_images(subarray_file, fullframe_file, out_dir='./', subarray_threshold=100, fullframe_threshold=100, max_separation=3.,
+                        aperture_radius=5, bkgd_in_radius=6, bkgd_out_radius=8):
     """MAIN FUNCTiON FOR COMPARING SOURCE RATES IN RATE FILES
 
     Parameters
@@ -167,6 +174,25 @@ def compare_rate_images(subarray_file, fullframe_file, out_dir='./'):
     out_dir : str
         Output directory into which products are saved
 
+    subarray_threshold : float
+        Number of sigma above the background needed to identify a source
+
+    fullframe_threshold : float
+        Number of sigma above the background needed to identify a source
+
+    max_separation : float
+        Maximum allowed separation between sources, in pixels, between the subarray
+        and full frame data in order for a source to be considered a match.
+
+    aperture_radius : int
+        Aperture radius (in pixels) to use for photometry
+
+    bkgd_in_radius : int
+        Inner radius (in pixels) to use for photometry background subtraction
+
+    bkgd_out_radius : int
+        Outer radius (in pixels) to use for photometry background subtraction
+
     Returns
     -------
     sub_sources : astropy.table.Table
@@ -177,13 +203,35 @@ def compare_rate_images(subarray_file, fullframe_file, out_dir='./'):
     subarray = datamodels.open(subarray_file)
     fullframe = datamodels.open(fullframe_file)
 
+    # Define coord transform functions
+    sub_xy_to_radec = subarray.meta.wcs.get_transform('detector', 'world')
+    ff_radec_to_xy = fullframe.meta.wcs.get_transform('world', 'detector')
+    ff_xy_to_radec = fullframe.meta.wcs.get_transform('detector', 'world')
+
+    # Check to be sure the two images overlap
+    ff_min_x = 0
+    ff_min_y = 0
+    ff_max_x = fullframe.meta.subarray.xsize - 1
+    ff_max_y = fullframe.meta.subarray.ysize - 1
+    cornerx = [0, 0, subarray.meta.subarray.xsize, subarray.meta.subarray.xsize]
+    cornery = [0, subarray.meta.subarray.ysize, subarray.meta.subarray.ysize, 0]
+    cornerra, cornerdec = sub_xy_to_radec(cornerx, cornery)
+    ffcornerx, ffcornery = ff_radec_to_xy(cornerra, cornerdec)
+    overlap = False
+    for fcx, fcy in zip(ffcornerx, ffcornery):
+        if ((fcx > ff_min_x) & (fcx < ff_max_x) & (fcy > ff_min_y) and (fcy < ff_max_y)):
+            overlap = True
+    if not overlap:
+        print("Suabrray file and full frame file do not overlap. Quitting.\n\n")
+        return 0
+
     # Locate sources
     sub_fwhm = get_fwhm(subarray.meta.instrument.filter)
     sub_source_image = os.path.join(out_dir, '{}_subarray_source_map_countrate_compare.png'.format(os.path.basename(subarray_file)))
-    sub_sources = find_sources(subarray.data, threshold=200, fwhm=sub_fwhm, show_sources=True, save_sources=True, plot_name=sub_source_image)
+    sub_sources = find_sources(subarray.data, threshold=subarray_threshold, fwhm=sub_fwhm, show_sources=True, save_sources=True, plot_name=sub_source_image)
     ff_fwhm = get_fwhm(fullframe.meta.instrument.filter)
     full_source_image = os.path.join(out_dir, '{}_fullframe_map_datamodels.png'.format(os.path.basename(fullframe_file)))
-    ff_sources = find_sources(fullframe.data, threshold=200, fwhm=ff_fwhm, show_sources=True, save_sources=True, plot_name=full_source_image)
+    ff_sources = find_sources(fullframe.data, threshold=fullframe_threshold, fwhm=ff_fwhm, show_sources=True, save_sources=True, plot_name=full_source_image)
 
     if sub_sources is None:
         print("No subarray sources to compare.")
@@ -197,10 +245,6 @@ def compare_rate_images(subarray_file, fullframe_file, out_dir='./'):
     # 1. Transform to RA, Dec
     # 2. Use WCS of full frame file to put coordinates in full frame coords
 
-    # Define coord transform functions
-    sub_xy_to_radec = subarray.meta.wcs.get_transform('detector', 'world')
-    ff_radec_to_xy = fullframe.meta.wcs.get_transform('world', 'detector')
-    ff_xy_to_radec = fullframe.meta.wcs.get_transform('detector', 'world')
 
     # Transform subarray x,y -> RA, Dec -> full frame x, y
     ra, dec = sub_xy_to_radec(sub_sources['xcentroid'], sub_sources['ycentroid'])
@@ -223,13 +267,16 @@ def compare_rate_images(subarray_file, fullframe_file, out_dir='./'):
     idx, d2d, d3d = sub_cat.match_to_catalog_3d(ff_cat)
 
     # Remove bad matches
-    pix_scale = subarray.meta.wcsinfo.cdelt1 * 3600.
-    max_sep = 1.0 * pix_scale * u.arcsec  # Matches must be within a pixel
+    pscale = subarray.meta.wcsinfo.cdelt1
+    if pscale is None:
+        pscale = np.abs(subarray.meta.wcsinfo.cd1_1)
+    pix_scale = pscale * 3600.
+    max_sep = max_separation * pix_scale * u.arcsec  # Matches must be within a pixel
     sep_constraint = d2d < max_sep
     sub_catalog_matches = sub_sources[sep_constraint]
     ff_catalog_matches = ff_sources[idx[sep_constraint]]
     num_matched = len(ff_catalog_matches)
-    print('Found {} matching sources.'.format(num_matched))
+    print('Found {} matching sources in the two input files.'.format(num_matched))
     if num_matched == 0:
         print("No matching sources found. Quitting.\n\n\n")
         return 0, 0
@@ -241,26 +288,27 @@ def compare_rate_images(subarray_file, fullframe_file, out_dir='./'):
     good_indexes = []
     non_zero_sub_dq = []
     non_zero_full_dq = []
-    for i, line in enumerate(sub_sources):
+    for i, line in enumerate(sub_catalog_matches):
         if ((line['fullframe_x'] > 5) & (line['fullframe_x'] < 2039) & \
             (line['fullframe_y'] > 5) & (line['fullframe_y'] < 2039)):
             sub_pos.append((line['xcentroid'], line['ycentroid']))
-            ff_pos.append((line['fullframe_x'], line['fullframe_y']))
+            #ff_pos.append((line['fullframe_x'], line['fullframe_y']))
+            ff_pos.append((ff_catalog_matches[i]['xcentroid'], ff_catalog_matches[i]['ycentroid']))
             good_indexes.append(i)
 
             # Make a note if there are any non-zero DQ flags within the apertures
             # During development, found some cases with NO_LIN_CORR and NO_FLAT_FIELD
             # that were screwing up photometry
-            yc_sub = np.int(np.round(line['ycentroid']))
-            xc_sub = np.int(np.round(line['xcentroid']))
+            yc_sub = int(np.round(line['ycentroid']))
+            xc_sub = int(np.round(line['xcentroid']))
             sub_dq = subarray.dq[yc_sub-3:yc_sub+4, xc_sub-3:xc_sub+4]
             if np.sum(sub_dq) > 0:
                 non_zero_sub_dq.append(True)
             else:
                 non_zero_sub_dq.append(False)
 
-            yc = np.int(np.round(line['fullframe_x']))
-            xc = np.int(np.round(line['fullframe_y']))
+            yc = int(np.round(line['fullframe_x']))
+            xc = int(np.round(line['fullframe_y']))
             sub_dq = fullframe.dq[yc-1:yc+2, xc-1:xc+2]
             if np.sum(sub_dq) > 0:
                 non_zero_full_dq.append(True)
@@ -278,10 +326,10 @@ def compare_rate_images(subarray_file, fullframe_file, out_dir='./'):
     #ff_pos = [(m['xcentroid'], m['ycentroid']) for m in ff_catalog_matches]
 
 
-    sub_aperture = CircularAperture(sub_pos, r=5.)
-    ff_aperture = CircularAperture(ff_pos, r=5.)
-    sub_annulus = CircularAnnulus(sub_pos, r_in=10, r_out=15)
-    full_annulus = CircularAnnulus(ff_pos, r_in=10, r_out=15)
+    sub_aperture = CircularAperture(sub_pos, r=aperture_radius)
+    ff_aperture = CircularAperture(ff_pos, r=aperture_radius)
+    sub_annulus = CircularAnnulus(sub_pos, r_in=bkgd_in_radius, r_out=bkgd_out_radius)
+    full_annulus = CircularAnnulus(ff_pos, r_in=bkgd_in_radius, r_out=bkgd_out_radius)
 
     # Photometry
     sub_phot_table = aperture_photometry(subarray.data, sub_aperture)
@@ -306,60 +354,94 @@ def compare_rate_images(subarray_file, fullframe_file, out_dir='./'):
     sub_phot_table['delta_from_fullframe_percent'] = delta_phot_perc
 
     # Keep track of whether there are bad pixels in the apertures
-    sub_dq = np.zeros(len(sub_sources), dtype=bool)
+    #sub_dq = np.zeros(len(sub_sources), dtype=bool)
+    #sub_dq[good_indexes] = non_zero_sub_dq
+    #sub_sources['sub_dq'] = sub_dq
+    #full_dq = np.zeros(len(sub_sources), dtype=bool)
+    #full_dq[good_indexes] = non_zero_full_dq
+    #sub_sources['full_dq'] = full_dq
+
+    sub_dq = np.zeros(len(sub_catalog_matches), dtype=bool)
     sub_dq[good_indexes] = non_zero_sub_dq
-    sub_sources['sub_dq'] = sub_dq
-    full_dq = np.zeros(len(sub_sources), dtype=bool)
+    sub_catalog_matches['sub_dq'] = sub_dq
+    full_dq = np.zeros(len(sub_catalog_matches), dtype=bool)
     full_dq[good_indexes] = non_zero_full_dq
-    sub_sources['full_dq'] = full_dq
+    sub_catalog_matches['full_dq'] = full_dq
 
     # Add photometry to the table
-    sub_phot_data = np.zeros(len(sub_sources))
+    #sub_phot_data = np.zeros(len(sub_sources))
+    #sub_phot_data[good_indexes] = sub_phot_table['aper_sum_bkgsub'].data
+    #ff_phot_data = np.zeros(len(sub_sources))
+    #ff_phot_data[good_indexes] = ff_phot_table['aper_sum_bkgsub'].data
+    #delta_phot_col = np.zeros(len(sub_sources))
+    #delta_phot_col[good_indexes] = delta_phot
+    #delta_phot_perc_col = np.zeros(len(sub_sources))
+    #delta_phot_perc_col[good_indexes] = delta_phot_perc
+
+    sub_phot_data = np.zeros(len(sub_catalog_matches))
     sub_phot_data[good_indexes] = sub_phot_table['aper_sum_bkgsub'].data
-    ff_phot_data = np.zeros(len(sub_sources))
+    ff_phot_data = np.zeros(len(sub_catalog_matches))
     ff_phot_data[good_indexes] = ff_phot_table['aper_sum_bkgsub'].data
-    delta_phot_col = np.zeros(len(sub_sources))
+    delta_phot_col = np.zeros(len(sub_catalog_matches))
     delta_phot_col[good_indexes] = delta_phot
-    delta_phot_perc_col = np.zeros(len(sub_sources))
+    delta_phot_perc_col = np.zeros(len(sub_catalog_matches))
     delta_phot_perc_col[good_indexes] = delta_phot_perc
 
-    sub_sources['sub_phot'] = sub_phot_data
-    sub_sources['ff_phot'] = ff_phot_data
-    sub_sources['d_phot'] = delta_phot_col
-    sub_sources['d_phot_p'] = delta_phot_perc_col
+    #sub_sources['sub_phot'] = sub_phot_data
+    #sub_sources['ff_phot'] = ff_phot_data
+    #sub_sources['d_phot'] = delta_phot_col
+    #sub_sources['d_phot_p'] = delta_phot_perc_col
 
-    sub_sources['xcentroid'].info.format = '7.3f'
-    sub_sources['ycentroid'].info.format = '7.3f'
-    sub_sources['fullframe_x'].info.format = '7.3f'
-    sub_sources['fullframe_y'].info.format = '7.3f'
-    sub_sources['sub_phot'].info.format = '7.3f'
-    sub_sources['ff_phot'].info.format = '7.3f'
-    sub_sources['d_phot'].info.format = '7.3f'
-    sub_sources['d_phot_p'].info.format = '7.3f'
-    print(sub_sources['xcentroid', 'ycentroid', 'fullframe_x', 'fullframe_y', 'sub_phot', 'ff_phot', 'd_phot_p', 'sub_dq', 'full_dq'])
+    #sub_sources['xcentroid'].info.format = '7.3f'
+    #sub_sources['ycentroid'].info.format = '7.3f'
+    #sub_sources['fullframe_x'].info.format = '7.3f'
+    #sub_sources['fullframe_y'].info.format = '7.3f'
+    #sub_sources['sub_phot'].info.format = '7.3f'
+    #sub_sources['ff_phot'].info.format = '7.3f'
+    #sub_sources['d_phot'].info.format = '7.3f'
+    #sub_sources['d_phot_p'].info.format = '7.3f'
+    #print(sub_sources['xcentroid', 'ycentroid', 'fullframe_x', 'fullframe_y', 'sub_phot', 'ff_phot', 'd_phot_p', 'sub_dq', 'full_dq'])
+
+    sub_catalog_matches['sub_phot'] = sub_phot_data
+    sub_catalog_matches['ff_phot'] = ff_phot_data
+    sub_catalog_matches['d_phot'] = delta_phot_col
+    sub_catalog_matches['d_phot_p'] = delta_phot_perc_col
+
+    sub_catalog_matches['xcentroid'].info.format = '7.3f'
+    sub_catalog_matches['ycentroid'].info.format = '7.3f'
+    sub_catalog_matches['fullframe_x'].info.format = '7.3f'
+    sub_catalog_matches['fullframe_y'].info.format = '7.3f'
+    sub_catalog_matches['sub_phot'].info.format = '7.3f'
+    sub_catalog_matches['ff_phot'].info.format = '7.3f'
+    sub_catalog_matches['d_phot'].info.format = '7.3f'
+    sub_catalog_matches['d_phot_p'].info.format = '7.3f'
+
+    final_sub_cat = sub_catalog_matches[good_indexes]
+
+    print(final_sub_cat['xcentroid', 'ycentroid', 'fullframe_x', 'fullframe_y', 'sub_phot', 'ff_phot', 'd_phot_p', 'sub_dq', 'full_dq'])
     print('')
 
     # Save the complete table
     sub_base = os.path.basename(subarray_file).replace('.fits', '')
     full_base = os.path.basename(fullframe_file).replace('.fits', '')
     table_name = os.path.join(out_dir, 'photometry_comparison_{}_{}.txt'.format(sub_base, full_base))
-    ascii.write(sub_sources, table_name, overwrite=True)
+    ascii.write(final_sub_cat, table_name, overwrite=True)
     print('Photometry results saved to: {}'.format(table_name))
 
     # Try filtering out sources where there is a pixel flagged in the full
     # frame or subarray DQ mask at the source location
     clean = []
-    for row in sub_sources:
+    for row in final_sub_cat:
         clean.append(row['sub_dq'] == False and row['full_dq'] == False)
     if np.sum(clean) > 0:
-        clean_table = sub_sources[clean]
+        clean_table = final_sub_cat[clean]
         print('Excluding sources with a pixel flagged in the DQ array:')
         med_clean_diff = np.around(np.median(clean_table['d_phot_p']), 1)
-        print('Median photometry difference between subarray and full frame sources is: {}%'.format(med_clean_diff))
+        print('Median photometry difference between subarray and full frame sources is: {}%\n\n\n'.format(med_clean_diff))
     else:
         clean_table = None
         print('No sources without a flagged pixel in the DQ arrays.')
-    return sub_sources, clean_table
+    return final_sub_cat, clean_table
 
 
 def median_background(annulus_masks, data):
