@@ -26,12 +26,13 @@ in units of arcseconds from the refrence pixel.
 from asdf import AsdfFile
 from astropy.modeling.models import Polynomial2D, Mapping, Shift
 import astropy.units as u
-from jwst.datamodels import DistortionModel, util
+from jwst.datamodels import DistortionModel
+from stdatamodels import util
 from mirage.utils.siaf_interface import sci_subarray_corners
 import numpy as np
 import pysiaf
 
-import read_siaf_table
+#import read_siaf_table
 
 
 def create_nircam_distortion(detector, aperture, outname, sci_pupil,
@@ -189,10 +190,10 @@ def create_nircam_distortion(detector, aperture, outname, sci_pupil,
     d.meta.pedigree = 'GROUND'
     d.meta.reftype = 'DISTORTION'
     d.meta.author = 'B. Hilbert'
-    d.meta.litref = "https://github.com/spacetelescope/jwreftools"
-    d.meta.description = "Distortion model from SIAF coefficients in pysiaf version 0.6.1"
+    d.meta.litref = "https://github.com/spacetelescope/nircam_calib/nircam_calib/reffile_creation/pipeline/distortion/nircam_distortion_reffiles_from_pysiaf.py"
+    d.meta.description = "Coron mode distortion model from PRD version 39"
     #d.meta.exp_type = exp_type
-    d.meta.useafter = "2014-10-01T00:00:00"
+    d.meta.useafter = "2014-10-01T00:00:01"
 
     # To be ready for the future where we will have filter-dependent solutions
     d.meta.instrument.filter = 'N/A'
@@ -200,8 +201,8 @@ def create_nircam_distortion(detector, aperture, outname, sci_pupil,
     # Create initial HISTORY ENTRY
     sdict = {'name': 'nircam_distortion_reffiles_from_pysiaf.py',
              'author': 'B.Hilbert',
-             'homepage': 'https://github.com/spacetelescope/jwreftools',
-             'version': '0.8'}
+             'homepage': 'https://github.com/spacetelescope/nircam_calib',
+             'version': '0.0'}
 
     entry = util.create_history_entry(history_entry, software=sdict)
     d.history = [entry]
