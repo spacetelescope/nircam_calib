@@ -16,7 +16,16 @@ hist = ("This reference file was created from the distortion coefficients contai
         "distortion coefficients. The translation model converts from units of pixels on the detector to "
         "V2,V3 in units of arcseconds, as well as the inverse.")
 
-basedir = 'reference_files/distortion/24Oct2019_round_trip_error_fixed'
+#basedir = 'reference_files/distortion/24Oct2019_round_trip_error_fixed'
+
+hist = ("This reference file was created from the distortion coefficients contained in pysiaf "
+        "version 0.13.0, which uses "
+        "version 39 of the PRD. This version of the PRD makes use of the new <detector>_FULL_WEDGE_RND"
+        "and <detector>_FULL_WEDGE_BAR parent apertures for coronagraphic observations. All "
+        "distortion coefficients are calculated from ground based data.")
+
+
+basedir = '/grp/jwst/wit/nircam/reference_files/distortion/coron_distortion_files_2021_Sept'
 
 # IMAGING metadata-----------------------------------------------
 sw_imaging_pupil = ['CLEAR', 'F162M', 'F164N', 'GDHS0', 'GDHS60', 'WLM8', 'WLP8', 'PINHOLES', 'MASKIPR', 'FLAT']
@@ -34,7 +43,7 @@ for aperture in nrc_apertures:
     detector, apname = aperture.split('_')
     outname = os.path.join(basedir, '{}_distortion.asdf'.format(aperture))
 
-    if np.int(detector[-1]) < 5:
+    if int(detector[-1]) < 5:
         pupil = sw_imaging_pupil
         #subarr = sw_imaging_subarr
         # Leaving subarrays as any means that new subarrays can be added later and the file won't need to be updated
@@ -46,7 +55,7 @@ for aperture in nrc_apertures:
         subarr = ['GENERIC']
         exp_type = lw_exptype
 
-    ref.create_nircam_distortion(detector, apname, outname, pupil, subarr, exp_type, hist)
+    #ref.create_nircam_distortion(detector, apname, outname, pupil, subarr, exp_type, hist)
 
 # CORONAGRAPHY metadata------------------------------------------
 # For coronagraphy, we expect the bar and round wedges to have different astrometric solutions,
@@ -56,17 +65,22 @@ for aperture in nrc_apertures:
 # ticket to add these apertures to SIAF. It might be worth waiting for that to happen before creating
 # these reference files?
 
-a2_round_aperture = ['NRCA2_FULL_MASK210R']
-a4_bar_aperture = ['NRCA4_FULL_MASKSWB']
-a5_round_aperture = ['NRCA5_FULL_MASK335R']
-a5_bar_aperture = ['NRCA5_FULL_MASKLWB']
+#a2_round_aperture = ['NRCA2_FULL_MASK210R']
+#a4_bar_aperture = ['NRCA4_FULL_MASKSWB']
+#a5_round_aperture = ['NRCA5_FULL_MASK335R']
+#a5_bar_aperture = ['NRCA5_FULL_MASKLWB']
+
+a2_round_aperture = ['NRCA2_FULL_WEDGE_RND']
+a4_bar_aperture = ['NRCA4_FULL_WEDGE_BAR']
+a5_round_aperture = ['NRCA5_FULL_WEDGE_RND']
+a5_bar_aperture = ['NRCA5_FULL_WEDGE_BAR']
 
 b1_round_aperture = ['NRCB1_MASK210R']
 b3_bar_aperture = ['NRCB3_MASKSWB']
 b5_round_aperture = ['NRCB5_MASK335R']
 b5_bar_aperture = ['NRCB5_MASKLWB']
 
-nrc_coron_apertures = a2_round_aperture + a4_bar_aperture + a5_round_aperture + a5_bar_aperture + b1_round_aperture + b3_bar_aperture + b5_round_aperture + b5_bar_aperture
+nrc_coron_apertures = a2_round_aperture + a4_bar_aperture + a5_round_aperture + a5_bar_aperture #+ b1_round_aperture + b3_bar_aperture + b5_round_aperture + b5_bar_aperture
 
 coron_exptype = ['NRC_CORON', 'NRC_TACQ', 'NRC_TACONFIRM']
 
@@ -77,10 +91,12 @@ for aperture in nrc_coron_apertures:
         apname = parts[1]
     elif len(parts) == 3:
         apname = '{}_{}'.format(parts[1], parts[2])
+    elif len(parts) == 4:
+        apname = '{}_{}_{}'.format(parts[1], parts[2], parts[3])
 
-    if aperture[-1] == 'R':
+    if parts[-1] == 'RND':
         pupil = ['MASKRND']
-    elif aperture[-1] == 'B':
+    elif parts[-1] == 'BAR':
         pupil = ['MASKBAR']
     else:
         raise ValueError('Bad pupil value: {}'.format(aperture))
