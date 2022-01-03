@@ -160,7 +160,7 @@ def compare_level3_catalogs(cat_file_1, cat_file_2, output_name, out_dir='./', m
 
 
 def compare_rate_images(subarray_file, fullframe_file, out_dir='./', subarray_threshold=100, fullframe_threshold=100, max_separation=3.,
-                        aperture_radius=5, bkgd_in_radius=6, bkgd_out_radius=8):
+                        aperture_radius=5, bkgd_in_radius=6, bkgd_out_radius=8, subarray_rate_file=None, fullframe_rate_file=None):
     """MAIN FUNCTiON FOR COMPARING SOURCE RATES IN RATE FILES
 
     Parameters
@@ -203,6 +203,18 @@ def compare_rate_images(subarray_file, fullframe_file, out_dir='./', subarray_th
     subarray = datamodels.open(subarray_file)
     fullframe = datamodels.open(fullframe_file)
 
+    # Quick test to see if using the rate files rather than the cal files
+    # makes any difference in the LW discrepancy between fullframe and subarray data
+    #if subarray_rate_file is not None:
+    #    subarray_rate = datamodels.open(subarray_rate_file)
+    #else:
+    #    subarray_rate = subarray
+
+    #if fullframe_rate_file is not None:
+    #    fullframe_rate = datamodels.open(fullframe_rate_file)
+    #else:
+    #    fullframe_rate = fullframe
+
     # Define coord transform functions
     sub_xy_to_radec = subarray.meta.wcs.get_transform('detector', 'world')
     ff_radec_to_xy = fullframe.meta.wcs.get_transform('world', 'detector')
@@ -228,10 +240,14 @@ def compare_rate_images(subarray_file, fullframe_file, out_dir='./', subarray_th
     # Locate sources
     sub_fwhm = get_fwhm(subarray.meta.instrument.filter)
     sub_source_image = os.path.join(out_dir, '{}_subarray_source_map_countrate_compare.png'.format(os.path.basename(subarray_file)))
-    sub_sources = find_sources(subarray.data, threshold=subarray_threshold, fwhm=sub_fwhm, show_sources=True, save_sources=True, plot_name=sub_source_image)
+    #sub_sources = find_sources(subarray.data, threshold=subarray_threshold, fwhm=sub_fwhm, show_sources=True, save_sources=True, plot_name=sub_source_image)
+    sub_sources = find_sources(subarray_rate.data, threshold=subarray_threshold, fwhm=sub_fwhm, show_sources=True, save_sources=True, plot_name=sub_source_image)
+
     ff_fwhm = get_fwhm(fullframe.meta.instrument.filter)
     full_source_image = os.path.join(out_dir, '{}_fullframe_map_datamodels.png'.format(os.path.basename(fullframe_file)))
-    ff_sources = find_sources(fullframe.data, threshold=fullframe_threshold, fwhm=ff_fwhm, show_sources=True, save_sources=True, plot_name=full_source_image)
+    #ff_sources = find_sources(fullframe.data, threshold=fullframe_threshold, fwhm=ff_fwhm, show_sources=True, save_sources=True, plot_name=full_source_image)
+    ff_sources = find_sources(fullframe_rate.data, threshold=fullframe_threshold, fwhm=ff_fwhm, show_sources=True, save_sources=True, plot_name=full_source_image)
+
 
     if sub_sources is None:
         print("No subarray sources to compare.")
@@ -332,17 +348,23 @@ def compare_rate_images(subarray_file, fullframe_file, out_dir='./', subarray_th
     full_annulus = CircularAnnulus(ff_pos, r_in=bkgd_in_radius, r_out=bkgd_out_radius)
 
     # Photometry
-    sub_phot_table = aperture_photometry(subarray.data, sub_aperture)
-    ff_phot_table = aperture_photometry(fullframe.data, ff_aperture)
+    #sub_phot_table = aperture_photometry(subarray.data, sub_aperture)
+    #ff_phot_table = aperture_photometry(fullframe.data, ff_aperture)
+    sub_phot_table = aperture_photometry(subarray_rate.data, sub_aperture)
+    ff_phot_table = aperture_photometry(fullframe_rate.data, ff_aperture)
+
     sub_annulus_masks = sub_annulus.to_mask(method='center')
     full_annulus_masks = full_annulus.to_mask(method='center')
 
-    sub_bkg_median = median_background(sub_annulus_masks, subarray.data)
+    #sub_bkg_median = median_background(sub_annulus_masks, subarray.data)
+    sub_bkg_median = median_background(sub_annulus_masks, subarray_rate.data)
+
     sub_phot_table['annulus_median'] = sub_bkg_median
     sub_phot_table['aper_bkg'] = sub_bkg_median * sub_aperture.area
     sub_phot_table['aper_sum_bkgsub'] = sub_phot_table['aperture_sum'] - sub_phot_table['aper_bkg']
 
-    full_bkg_median = median_background(full_annulus_masks, fullframe.data)
+    #full_bkg_median = median_background(full_annulus_masks, fullframe.data)
+    full_bkg_median = median_background(full_annulus_masks, fullframe_rate.data)
     ff_phot_table['annulus_median'] = full_bkg_median
     ff_phot_table['aper_bkg'] = full_bkg_median * ff_aperture.area
     ff_phot_table['aper_sum_bkgsub'] = ff_phot_table['aperture_sum'] - ff_phot_table['aper_bkg']
