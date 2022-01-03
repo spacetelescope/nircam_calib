@@ -220,7 +220,7 @@ def run_using_fits(full_frame_file, subarray_files, output_dir='./'):
         print('Standard deviation of differences: {} pixels\n\n\n'.format(dev))
 
 
-def run(full_frame_file, subarray_files, output_dir='./'):
+def run(full_frame_file, subarray_files, output_dir='./', fullframe_threshold=500, subarray_threshold=100):
     """MAIN FUNCTION
 
     Paramters
@@ -246,7 +246,7 @@ def run(full_frame_file, subarray_files, output_dir='./'):
     ff_fwhm = get_fwhm(ff_model.meta.instrument.filter)
 
     ffbasename = os.path.basename(full_frame_file)
-    full_frame_sources = find_sources(ff_model.data, threshold=500, fwhm=ff_fwhm, plot_name='{}_full_frame_source_map_datamodels.png'.format(ffbasename))
+    full_frame_sources = find_sources(ff_model.data, threshold=fullframe_threshold, fwhm=ff_fwhm, plot_name='{}_full_frame_source_map_datamodels.png'.format(ffbasename))
     ascii.write(full_frame_sources, os.path.join(output_dir, '{}_ff_sources_datamodels.txt'.format(ffbasename)), overwrite=True)
 
     # Read in subarray data and locate sources
@@ -258,7 +258,7 @@ def run(full_frame_file, subarray_files, output_dir='./'):
         # Calculate the FWHM in pixels to input to the source finder
         sub_fwhm = get_fwhm(sub_model.meta.instrument.filter)
         plotname = os.path.join(output_dir, '{}_source_map_datamodels.png'.format(os.path.basename(subfile)))
-        subarray_sources = find_sources(sub_model.data, threshold=500, fwhm=sub_fwhm, plot_name=plotname)
+        subarray_sources = find_sources(sub_model.data, threshold=subarray_threshold, fwhm=sub_fwhm, plot_name=plotname)
 
         # If no sources are found in the subarray, then move on to the next
         if subarray_sources is None:
