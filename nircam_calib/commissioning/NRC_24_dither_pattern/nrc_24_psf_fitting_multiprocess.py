@@ -16,7 +16,7 @@ from webbpsf.gridded_library import display_psf_grid
 
 import multiprocessing
 
-def convert_sci_to_sky(xsci, ysci, pheader, fheader):
+def convert_sci_to_sky(xsci, ysci, pheader, fheader, siaf):
     """
     Convert science pixel coordinates to RA/Dec
 
@@ -45,7 +45,6 @@ def convert_sci_to_sky(xsci, ysci, pheader, fheader):
     #hdul.close
 
     # Get SIAF info
-    siaf = pysiaf.Siaf('NIRCam')
     apername = pheader.get('APERNAME')
     apsiaf = siaf[apername]
 
@@ -67,7 +66,7 @@ def convert_sci_to_sky(xsci, ysci, pheader, fheader):
     return (ra_deg, dec_deg)
 
 # This is the function that actually runs the PSF fitting on the data files from the same SCA
-def psf_fit(data_array, pheader, fheader, data_file, psf_grid):
+def psf_fit(data_array, pheader, fheader, data_file, psf_grid, siaf):
 
 	# Let's run a quick fitting using DAOStarFinder
 	mean, median, std = sigma_clipped_stats(data_array, sigma=3.0) 
@@ -130,9 +129,8 @@ def psf_fit(data_array, pheader, fheader, data_file, psf_grid):
 	
 	RA_fit = np.zeros(len(tbl['x_fit']))
 	DEC_fit = np.zeros(len(tbl['x_fit']))
-	for star in range(len(tbl['x_fit'])):
-		RA_fit[star], DEC_fit[star] = convert_sci_to_sky(tbl['x_fit'][star], tbl['y_fit'][star], pheader, fheader)
-	
+	RA_fit, DEC_fit = convert_sci_to_sky(tbl['x_fit'], tbl['y_fit'], pheader, fheader, siaf)
+
 	tbl.add_column(DEC_fit, index=0, name='DEC_fit')
 	tbl.add_column(RA_fit, index=0, name='RA_fit')
 	
@@ -161,15 +159,19 @@ def main():
 	nrc = webbpsf.NIRCam()
 	nrc.filter = hdu[0].header['FILTER']#"F150W"
 	nrc.detector = hdu[0].header['DETECTOR']#'NRCA3'
-	nrc_grid = nrc.psf_grid(num_psfs=9, all_detectors=False)
+	#nrc_grid = nrc.psf_grid(num_psfs=9, all_detectors=False)
+	nrc_grid = nrc.psf_grid(num_psfs=25, all_detectors=False, fov_pixels=33, oversample=2)
 
 	# And let's close the first data file. 
 	hdu.close()
 	
 	# Now, let's spawn processes that will run on the various images.
-	
-	number_of_processes_at_the_same_time = 4
-	
+
+	number_of_processes_at_the_same_time = 8
+
+	# Create an instance of siaf to pass through along to the psf_fit function. 
+	siaf = pysiaf.Siaf('NIRCam')
+
 	process_list = []
 	for i in range(number_of_processes_at_the_same_time):
 		data_file_name = data_files[i]
@@ -179,7 +181,7 @@ def main():
 		fheader = hdu[1].header
 		hdu.close()
 		#print(data_file_name)
-		p = multiprocessing.Process(target=psf_fit, args=(data_array, pheader, fheader, data_file_name, nrc_grid))
+		p = multiprocessing.Process(target=psf_fit, args=(data_array, pheader, fheader, data_file_name, nrc_grid, siaf))
 		p.start()
 		process_list.append(p)
 	
@@ -192,6 +194,4 @@ if __name__ == '__main__':
     print('starting main')
     main()
     print('finishing main')
-
-
 
