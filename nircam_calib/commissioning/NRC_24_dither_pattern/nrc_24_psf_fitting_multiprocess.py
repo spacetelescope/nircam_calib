@@ -167,11 +167,13 @@ def main():
 	hdu.close()
 	
 	# Now, let's spawn processes that will run on the various images.
-
+	
+	number_of_processes_at_the_same_time = 4
+	
 	process_list = []
-	for i in range(4):
+	for i in range(number_of_processes_at_the_same_time):
 		data_file_name = data_files[i]
-		hdu = fits.open(data_path+data_files[0]+'.fits')
+		hdu = fits.open(data_path+data_files[i]+'.fits')
 		data_array = hdu[1].data
 		pheader = hdu[0].header
 		fheader = hdu[1].header
