@@ -21,7 +21,16 @@ hist = ("This reference file was created from the distortion coefficients contai
         "distortion coefficients. The translation model converts from units of pixels on the detector to "
         "V2,V3 in units of arcseconds, as well as the inverse.")
 
-basedir = 'reference_files/distortion/24Oct2019_round_trip_error_fixed'
+#basedir = 'reference_files/distortion/24Oct2019_round_trip_error_fixed'
+
+hist = ("This reference file was created from the distortion coefficients contained in pysiaf "
+        "version 0.13.0, which uses "
+        "version 39 of the PRD. This version of the PRD makes use of the new <detector>_FULL_WEDGE_RND"
+        "and <detector>_FULL_WEDGE_BAR parent apertures for coronagraphic observations. All "
+        "distortion coefficients are calculated from ground based data.")
+
+
+basedir = '/grp/jwst/wit/nircam/reference_files/distortion/coron_distortion_files_2021_Sept'
 
 # IMAGING metadata-----------------------------------------------
 sw_imaging_pupil = ['CLEAR', 'F162M', 'F164N', 'GDHS0', 'GDHS60', 'WLM8', 'WLP8', 'PINHOLES', 'MASKIPR', 'FLAT']
@@ -39,7 +48,7 @@ for aperture in nrc_apertures:
     detector, apname = aperture.split('_')
     outname = os.path.join(basedir, '{}_distortion.asdf'.format(aperture))
 
-    if np.int(detector[-1]) < 5:
+    if int(detector[-1]) < 5:
         pupil = sw_imaging_pupil
         #subarr = sw_imaging_subarr
         # Leaving subarrays as any means that new subarrays can be added later and the file won't need to be updated
@@ -60,6 +69,7 @@ for aperture in nrc_apertures:
 # combine the NRCA1_FULL coefficients with the wedge offsets in the SIAF file. John is putting in a
 # ticket to add these apertures to SIAF. It might be worth waiting for that to happen before creating
 # these reference files?
+
 
 # These apertures use a distortion model that is a shift + the imaging mode coefficients. A good approximation,
 # but not exact. These are intended as a first attempt at getting this distortion model correct. We now have a
@@ -105,6 +115,8 @@ for aperture in nrc_coron_apertures:
         apname = parts[1]
     elif len(parts) == 3:
         apname = '{}_{}'.format(parts[1], parts[2])
+    elif len(parts) == 4:
+        apname = '{}_{}_{}'.format(parts[1], parts[2], parts[3])
 
     if 'RND' in aperture:
         pupil = ['MASKRND']

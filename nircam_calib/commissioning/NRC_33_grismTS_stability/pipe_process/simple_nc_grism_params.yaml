@@ -1,0 +1,41 @@
+description: Applying co-variance weights
+procFiles: splintegrated_data/*.fits
+excludeList: null
+srcName: CAR-33 target
+srcNameShort: car33_p002_simple_stsci
+nightName: prog1442
+dispDirection: x ## dispersion direction 'x' or 'y'
+bkgSubDirections: ['Y'] ## Order in which to do background subtractions
+starPositions: ## positions of the stars in the spatial direction. The first one is the target
+   - 34
+refPhotCentering: null ## photometry fits file where to obtain centroid shifts to apply from 1 star/source
+bkgRegionsX: ## a list of background regions in the X direction
+   - [5, 250]
+   - [2020,2044]
+bkgOrderX: 0 ## order of polynomial subtraction in the X direction
+bkgRegionsY: ## a list of background regions in the Y direction
+   - [18, 28]
+   - [40,50]
+bkgOrderY: 0 ## order of polynomial subtraction in the Y direction
+backPreScreen: True ## Pre-screen the background for outliers before trying to fit?
+apWidth: 4. ## Source aperture width
+dispPixels: [312, 2010] ## pixels to use in the dispersion direction
+jdRef: 2457551 ## JD reference offset to subtract for plotting
+timingMethod: JWSTint ## how to assign integration times? None, 'JWSTint' will add int time to exposure start
+isCube: False ## Is the data a cube (3D)?
+cubePlane: 0 ## The plane to choose if data is in cubes
+doCentering: False ## Center the aperturess with Gaussian?
+FITSextension: 0 ## FITS extension of science frames
+HEADextension: 0 ## FITS extension of the header info (for exposure and timing)
+isSlope: True ## Is the FITS image a slope image that should be multiplied by the int time?
+readNoise: 13. ## Read noise in electrons
+detectorGain: 1.8 ## Optionally specify the detector gain e-/DN
+dateFormat: Two Part ## Format of date. "Two Part" is split over DATE-OBS and TIME-OBS, whereas "One Part" is all in DATE-OBS
+waveCalMethod: NIRCamTS ## the wavelength calibration method (None/null, NIRCamTS)
+waveCalOffset: 0.059 ## offset to the wavelength calibration, subtracted afterwards
+readNoiseCorrelation: False ## Treat the read noise as correlated across pixels?
+readNoiseCorrVal: 0.08 ## The value of reaad noise correlation (if handling read Noise correlation)
+ignorePhotNoiseInCovariance: False ## a diagnostic parameter to see covariance weights w/ out photon noise
+fixedProfile: True ## fixed profile throughout
+sigForBadPx: 300 ## number of sigma difference from smoothed profile where to mark bad pixels
+saveRefRow: False ## save rows of reference pixels?

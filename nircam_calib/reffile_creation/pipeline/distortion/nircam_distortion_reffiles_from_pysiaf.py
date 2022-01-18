@@ -32,7 +32,7 @@ from mirage.utils.siaf_interface import sci_subarray_corners
 import numpy as np
 import pysiaf
 
-#mport read_siaf_table
+#import read_siaf_table
 
 
 def create_nircam_distortion(detector, aperture, outname, sci_pupil,

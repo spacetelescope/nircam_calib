@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 '''
-Create NIRCam photom (flux calibration) and 
+Create NIRCam photom (flux calibration) and
 pixel area map (PAM) reference files using refactored synphot
 '''
 
@@ -15,7 +15,8 @@ from scipy.stats import sigmaclip
 from astropy.io import fits,ascii
 from astropy.table import Table,vstack
 from astropy import units as u
-from jwst.datamodels import NircamPhotomModel
+import pysiaf
+from jwst.datamodels import NrcImgPhotomModel, NrcWfssPhotomModel
 from scipy.integrate import simps
 import sys
 
@@ -48,7 +49,6 @@ class Photom:
         self.zeropoint_base = 'NIRCam_zeropoints'
         self.photom_base = 'NIRCam_photom'
         self.grism_thruput = '/grp/jwst/wit/nircam/reference_files/SpectralResponse_2015-Final/Grisms/NIRCam_LW_grism_efficiencies_from_Tom_Greene.csv'
-        self.model = NircamPhotomModel()
         self.pam_outfile = None
         self.photom_outfile = None
         self.author = 'Nircam Team'
@@ -58,18 +58,26 @@ class Photom:
         self.pedigree = 'GROUND'
         self.pam_history = None
         self.photom_history = None
-        
+
 
     def get_pixel_area(self):
         """Use SIAF to get nominal pixel area at reference location"""
-        print('To calc pixel area, using: {} {}'.format(self.siaf_row['XSciScale'].data.data[0], self.siaf_row['YSciScale'].data.data[0]))
-        xscale = hypot(self.xcoeffs[1], self.ycoeffs[1])
-        yscale = hypot(self.xcoeffs[2], self.ycoeffs[2])
-        bx = atan2(self.xcoeffs[1], self.ycoeffs[1])
-        by = atan2(self.xcoeffs[2], self.ycoeffs[2])
-        return xscale * yscale * sin(bx)
+        xscale = hypot(self.siaf.Sci2IdlX10, self.siaf.Sci2IdlY10)
+        yscale = hypot(self.siaf.Sci2IdlX11, self.siaf.Sci2IdlY11)
+        bx = atan2(self.siaf.Sci2IdlX10, self.siaf.Sci2IdlY10)
+        return xscale * yscale * sin(bx) * u.arcsecond * u.arcsecond
 
-    
+
+    def find_gain_pre_launch(self):
+        """Use gain values determined by the IDT from bootstrapping
+        CV3 data
+        """
+        if (('5' in self.detector) or ('LONG' in self.detector.upper())):
+            self.gain = 1.82
+        else:
+            self.gain = 2.05
+
+
     def find_gain(self):
         """Read in gain data from a fits file"""
         with fits.open(self.gain_file) as h:
@@ -92,32 +100,33 @@ class Photom:
         clipped,lo,hi = sigmaclip(gain2d[good],low=3,high=3)
         self.gain = clipped.mean()
 
-        
+
     def make_photom(self):
         """MAIN FUNCTION"""
         # Check inputs
         if self.imaging_throughput_files is None:
-            print("No imaging throughput files specified! Quitting.")
-            sys.exit()
+            raise ValueError("No imaging throughput files specified! Quitting.")
         if self.detector is None:
-            print("No detector specified! Quitting.")
-            sys.exit()
+            raise ValueError("No detector specified! Quitting.")
+
+        self.siaf = pysiaf.Siaf('nircam')['NRC{}_FULL'.format(self.detector)]
 
         # Lists of polynomial coefficients from SIAF
         self.xcoeffs, self.ycoeffs = self.get_coefficients()
-            
+
         # Find the nominal pixel area from the SIAF
         self.pixel_area_a2 = self.get_pixel_area()
-            
+
         # Required header keyword outputs
         sterrad_per_arcsec2 = (1. / 3600. * np.pi / 180.)**2
         self.str_per_detector = (self.detector_width * self.detector_length *
                                  self.pixel_area_a2) * sterrad_per_arcsec2 * u.sr
-        self.pixel_area_sr = self.pixel_area_a2 * sterrad_per_arcsec2 * u.arcsecond * u.arcsecond
+        self.pixel_area_sr = self.pixel_area_a2.to(u.sr)
 
         # Calculate the appropriate gain value to use
-        self.find_gain()
-        
+        #self.find_gain()
+        self.find_gain_pre_launch()
+
         # Calculations for imaging filters
         img_tab = self.imaging_calibrations(self.imaging_throughput_files)
 
@@ -129,7 +138,7 @@ class Photom:
             # Combine the imaging and grism photom tables
             print(grism_table.shape,grism_table[0].shape)
             print(img_tab.shape,img_tab[0].shape)
-            
+
             photom_table = np.append(img_tab,grism_table)
             print(photom_table.shape,photom_table[0].shape)
         else:
@@ -142,7 +151,7 @@ class Photom:
         if self.photom_outfile is None:
             self.photom_outfile = 'NIRCam_{}_photom.fits'.format(self.detector)
         self.save_photom_model(photom_table,self.photom_outfile)
-        
+
 
     def read_listfile(self,file):
         """
@@ -154,7 +163,7 @@ class Photom:
 
         Returns:
         --------
-        List of filenames 
+        List of filenames
         """
         flist = []
         with open(file) as f:
@@ -170,22 +179,24 @@ class Photom:
 
         Arguments:
         ----------
-        listfile -- A text file that lists all of the filter 
+        listfile -- A text file that lists all of the filter
                     throughput curves
 
         Returns:
         --------
-        Astropy table containing flux calibration information in 
+        Astropy table containing flux calibration information in
         the photom reference file format
         """
-        results = Table() #Table of filter vegamag zeropoints 
+        self.model = NrcImgPhotomModel()
+
+        results = Table() #Table of filter vegamag zeropoints
         dets = []
         filts = np.array([])
         realfilt = np.array([])
         pupil = np.array([])
         mods = []
-        megajy_sterradian = np.array([])
-        unc = np.array([])
+        megajy_sterradian = np.array([]) * u.megajansky / u.sr
+        unc = np.array([]) * u.megajansky / u.sr
         vegazp = []
         stzp = []
         abzp = []
@@ -196,7 +207,7 @@ class Photom:
         wave = []
         relresp = []
         photom_results = []
-        
+
         # Read in imaging throughput file list
         files = []
         with open(listfile) as f:
@@ -209,7 +220,7 @@ class Photom:
         zeros = np.zeros(self.maxlen)
         waves = np.append([zeros],(len(files)-1)*[zeros],axis=0)
         relresp = waves
-                             
+
         for file in files:
             # Get filter, module name from bandpass filename
             compname = fits.getval(file,'COMPNAME')
@@ -218,7 +229,7 @@ class Photom:
             module = compname[-1:].upper()
             filts = np.append(filts,filter)
             mods.append(module)
-        
+
             # Inputs for photom reference file
             if filter in self.filter_dict:
                 f = self.filter_dict[filter]
@@ -233,10 +244,10 @@ class Photom:
             # as well as pivot wavelength.
             # Uncertainty blindly set to 20%
             vzp, azp, szp, flambda, fn, mjy, pivotwave = self.synphot_calcs(file)
-            mjy = mjy / self.pixel_area_sr
+            mjy = mjy  * u.megajansky / self.pixel_area_sr
             megajy_sterradian = np.append(megajy_sterradian,mjy)
             unc = np.append(unc,mjy * 0.2)
-            
+
             vegazp.append(vzp)
             abzp.append(azp)
             stzp.append(szp)
@@ -253,19 +264,21 @@ class Photom:
         # print(nelem)
         # print(waves.shape)
         # print(relresp.shape)
-            
-        photom_response = np.array(zip(realfilt,pupil,megajy_sterradian,unc,order,nelem,waves,relresp),dtype=self.model.phot_table.dtype)
+
+        #photom_response = np.array(zip(realfilt,pupil,megajy_sterradian,unc,order,nelem,waves,relresp),dtype=self.model.phot_table.dtype)
+        photom_response = np.array(list(zip(realfilt,pupil,megajy_sterradian.value,unc.value)),dtype=self.model.phot_table.dtype)
+
 
         print('Data placed into zipped array:')
-        for i in range(6):
+        for i in range(4):
             print(photom_response[0][i])
 
         print("unc is not being brought into photom_response!! Why not????")
-        
+
         print(unc)
-        print(photom_response[0][4])
+        print(photom_response[0][2])
         print(photom_response[0][3])
-        
+
         # Results below will be placed into a table and written out in ascii
         # It is not used in the construction of the reference file, and
         # contains additional info that the reference file doesn't need
@@ -294,10 +307,10 @@ class Photom:
         #photom_results['uncertainty'] = np.array(mjy_str) * 0.2
         #photom_results['nelem'] = np.zeros(len(filts),dtype=np.int)
         #photom_results['order'] = np.zeros(len(filts),dtype=np.int)
-        
+
         #zeroarr = np.zeros(self.maxlen,dtype=np.float32)
         #zerolist = np.append([zeroarr],(len(pupil)-1)*[zeroarr],axis=0)
-            
+
         #photom_results['wavelength'] = zerolist
         #photom_results['relresponse'] = zerolist
         return photom_response
@@ -311,9 +324,9 @@ class Photom:
 
     def grism_cal(self,throughput_files):
         """
-        Calculate flux cal outputs for grism mode. Input files should 
-        contain the total system throughput for the grism plus crossing 
-        filter. The input file list should contain throughputs for all 
+        Calculate flux cal outputs for grism mode. Input files should
+        contain the total system throughput for the grism plus crossing
+        filter. The input file list should contain throughputs for all
         orders of just a single grism+crossing filter.
 
         Arguments:
@@ -325,6 +338,7 @@ class Photom:
         Astropy table containing flux calibration information for grism mode
         """
         print('need to update this for synphot')
+        self.model = NrcWfssPhotomModel()
 
         allrows = []
         filters = np.array([])
@@ -337,20 +351,20 @@ class Photom:
         resps = np.array([])
         #waves = np.expand_dims(waves,axis=0)
         #resps = np.expand_dims(resps,axis=0)
-        
+
         for file in throughput_files:
             # Read in necessary file info
             with fits.open(file) as h:
                 cname = h[0].header['COMPNAME']
 
-            junk,filter,mod = cname.split('_') 
+            junk,filter,mod = cname.split('_')
             mod = mod[-1].upper()
             pupil = 'GRISMR'
             print('Eventually need to be smarter about pupil value!!!!!')
-        
+
             print("opening {}".format(file))
             bp = SpectralElement.from_file(file)
-                        
+
             # Now reduce the PCE curve by a factor equal to
             # the gain, in order to get the output to translate
             # from ADU/sec rather than from e/sec
@@ -364,12 +378,12 @@ class Photom:
             # dispersion value is used.
             ord = file.find('order')
             order = file[ord+5]
-            dispersion = self.disp[order] 
+            dispersion = self.disp[order]
 
             #find pivot? mean? center? effective? wavelength
             #denom = self.h * self.c / eff_lambda
             #countratedensity = self.telescope_area * tp['Throughput'] * vegaflux / denom
-        
+
             #countratedensityflux,countratedensitywave,pwave = self.getcountsflux(bp)
             #totalrate = self.integrate(countratedensity)
 
@@ -382,10 +396,10 @@ class Photom:
             countratedensityflux = obs(obs.binset, flux_unit='count', area=self.telescope_area)
 
             print('countratedensityflux',countratedensityflux)
-            
+
             # Multiply by dispersion
             countratedensityflux *= dispersion
-            
+
             # Countrate density at the pivot wavelength
             print('pivot',pwave.value)
             print('countratedensityflux*dispersion',countratedensityflux)
@@ -393,7 +407,7 @@ class Photom:
             #cnorm = np.interp(pwave.value,obs.binset,countratedensityflux)
             cnorm = obs(pwave,flux_unit='count',area=self.telescope_area) * dispersion
             print('cnorm',cnorm)
-            
+
             # Vega flux value at pivot wavelength, convert to Jansky
             vega_pivot = self.vega(pwave)
             j0 = units.convert_flux(pwave,vega_pivot,'MJy')
@@ -428,7 +442,7 @@ class Photom:
             # Calculate Vega flux at each wavelength
             nelem = len(allwaves)
             allfluxes = self.vega(allwaves)
-            alljansky = units.convert_flux(allwaves,allfluxes,'MJy')            
+            alljansky = units.convert_flux(allwaves,allfluxes,'MJy')
             allcounts = np.interp(allwaves,obs.binset,countratedensityflux)
             #allfluxes = np.interp(allwaves,self.vega.waveset,self.vega(self.vega.waveset))
             #alljansky = self.toJansky(allfluxes,allwaves) / 1.e6
@@ -479,8 +493,8 @@ class Photom:
                 print(allratio.value[bad[0][0:10]])
                 print(allwaves)
                 stop
-                
-            
+
+
             # Pad allwaves and allratio to be the length needed by the
             # photom reference file. Also convert wavelengths to microns.
             allwaves = np.pad(allwaves/1.e4,(0,self.maxlen-nelem),'constant')
@@ -492,7 +506,7 @@ class Photom:
             print(alljansky[100:105]/allcounts[100:105])
             print(ratio)
             print(allratio[100:105])
-            
+
             print("******************")
             print("******************")
             print("******************")
@@ -516,11 +530,11 @@ class Photom:
                 waves = np.expand_dims(waves,axis=0)
                 resps = allratio
                 resps = np.expand_dims(resps,axis=0)
-            else:    
+            else:
                 waves = np.append(waves,np.expand_dims(allwaves,axis=0),axis=0)
                 resps = np.append(resps,np.expand_dims(allratio,axis=0),axis=0)
 
-                
+
         print('waves.shape',waves.shape)
         print('resps.shape',resps.shape)
 
@@ -532,7 +546,7 @@ class Photom:
         print(nelems)
         print(waves[0,40:45])
         print(resps[0,40:45])
-    
+
         # Zip all data together
         alldata = np.array(zip(np.array(filters),np.array(pupils),np.array(fluxes),np.array(uncs),np.array(orders),np.array(nelems),np.array(waves),np.array(resps)),dtype=self.model.phot_table.dtype)
 
@@ -561,7 +575,7 @@ class Photom:
         Arguments:
         ----------
         tab -- Astropy table contiaining flux cal information to be saved
-        outfile -- Name of file in which to save flux cal info 
+        outfile -- Name of file in which to save flux cal info
 
         Returns:
         --------
@@ -575,14 +589,12 @@ class Photom:
         print(self.model.phot_table[0][1])
         print(self.model.phot_table[0][2])
         print(self.model.phot_table[0][3])
-        print(self.model.phot_table[0][4])
         print('')
         print(self.model.phot_table['filter'])
         print(self.model.phot_table['pupil'])
-        print(self.model.phot_table['order'])
         print(self.model.phot_table['photmjsr'])
         print(self.model.phot_table['uncertainty'])
-        
+
         # Set metadata
         self.model.meta.author = self.author
         self.model.meta.telescope = 'JWST'
@@ -598,8 +610,15 @@ class Photom:
         self.model.meta.pedigree = self.pedigree
         self.model.meta.useafter = self.useafter
 
-        self.model.meta.photometry.pixelarea_arcsecsq = self.pixel_area_a2
-        self.model.meta.photometry.pixelarea_steradians = self.pixel_area_sr
+        self.model.meta.photometry.pixelarea_arcsecsq = self.pixel_area_a2.value
+        self.model.meta.photometry.pixelarea_steradians = self.pixel_area_sr.value
+
+        if isinstance(self.model, jwst.datamodels.photom.NrcWfssPhotomModel):
+            self.model.meta.exposure.type = 'NRC_WFSS'
+            self.model.meta.exposure.p_exptype = 'NRC_WFSS|NRC_TSGRISM|NRC_GRISM|'
+        elif isinstance(self.model, jwst.datamodels.photom.NrcImgPhotomModel):
+            self.model.meta.exposure.type = 'NRC_IMAGE'
+            self.model.meta.exposure.p_exptype = 'NRC_IMAGE|NRC_TSIMAGE|NRC_FLAT|NRC_CORON|NRC_TACONFIRM|NRC_TACQ|NRC_FOCUS|'
 
         if outfile is None:
             outfile = 'NIRCam_{}_photom.fits'.format(self.detector)
@@ -611,29 +630,29 @@ class Photom:
         #read in necessary file info
         with fits.open(file) as h:
             cname = h[0].header['COMPNAME']
-            
-        junk,filter,mod = cname.split('_') 
+
+        junk,filter,mod = cname.split('_')
         mod = mod[-1].upper()
         pupil = 'GRISMR'
         print('Eventually need to be smarter about pupil value!!!!!')
-        
+
         print("opening {}".format(file))
-        bp = S.FileBandpass(file) 
+        bp = S.FileBandpass(file)
 
         #convert to angstroms, to match the source spectrum
         bp.convert('Angstrom')
-        
+
         #need to find the order here, so that the proper
         #dispersion value is used.
         #order = h[0].header['SOMETHING']
         ord = file.find('order')
         order = file[ord+5]
-        dispersion = self.disp[order] 
-                
+        dispersion = self.disp[order]
+
         #find pivot? mean? center? effective? wavelength
         #denom = self.h * self.c / eff_lambda
         #countratedensity = self.telescope_area * tp['Throughput'] * vegaflux / denom
-        
+
         countratedensity,pwave = self.getcountsflux(file)
         #totalrate = self.integrate(countratedensity)
 
@@ -642,7 +661,7 @@ class Photom:
 
         countratedensityflux = countratedensity.flux
         countratedensityflux *= dispersion
-            
+
         #countrate density at the pivot wavelength
         cnorm = np.interp(pwave,countratedensity.wave,countratedensityflux)
 
@@ -659,7 +678,7 @@ class Photom:
         deltawave = minwave / (np.absolute(np.int(order))*self.resolving_power)
         allwaves = np.arange(minwave+deltawave/2,maxwave+deltawave,deltawave)
         nelem = len(allwaves)
-            
+
         allcounts = np.interp(allwaves,countratedensity.wave,countratedensityflux)
         allfluxes = np.interp(allwaves,self.src_spectrum.wave,self.src_spectrum.flux)
         alljansky = self.toJansky(allfluxes,allwaves)
@@ -674,18 +693,18 @@ class Photom:
         uncertainty = ratio*.1
         newrow = [filter,pupil,np.int(order),ratio*conversion_factor,uncertainty,nelem,allwaves,allratio]
         return newrow
-        
+
 
     def toJansky(self, fluxdensity, wavelength):
         """
         Convert flux density in flam units (erg s-1 cm-2 A-1)
         to Jansky (10^-23 erg s-1 cm-2 Hz-1)
-        
+
         Arguments:
         ----------
         fluxdensity -- flux density value
         wavelength -- wavelength corresponding to the flux density
-        
+
         Returns:
         --------
         Flux density converted to Jansky
@@ -694,12 +713,12 @@ class Photom:
         fnu = fluxdensity * wavelength**2 / c / 1e6
         return fnu * 1.e26
 
-                
+
     def integrate(self, obs):
         """
         Integrate a synphot Observation object
         to get total countrate density
-        
+
         Arguments:
         ----------
         obs -- synphot observation object
@@ -727,7 +746,7 @@ class Photom:
         obs = Observation(self.vega, bandpass)
         return obs
 
-    
+
     def getcountsflux_kevin(self,something):
         """NOT USED"""
         #given an input flux calibrated spectrum and throughput curve, calculate flux in a bandpass
@@ -738,12 +757,12 @@ class Photom:
 
         #multiply filter passband by the Vega spectrum
         aval = filter * spectrum
-        
+
         #translate to photon flux
         photon= h * speedoflight * 1.e+06 / spectrumwl
         value = aperture * aval * spectrumfl / photon
         return value
-                
+
 
     def save_photom_reffile_astropy(self, photomtab, descrip):
         """NOT USED"""
@@ -764,7 +783,7 @@ class Photom:
 
         h[0].header['PIXAR_SR'] = self.pixar_sr
         h[0].header['PIXAR_A2'] = self.pixar_a2
-        
+
         #insert data
         #model.phot_table['filter'] = photomtab['FILTER']
         #model.phot_table['pupil'] = photomtab['PUPIL']
@@ -774,7 +793,7 @@ class Photom:
         #model.phot_table['wavelength'] = 0.
         #model.phot_table['relresponse'] = 0.
 
-        
+
     def save_photom_reffile(self,photomtab,descrip):
         """NOT USED"""
         #save an input table of photom results to a file
@@ -789,7 +808,7 @@ class Photom:
         model.meta.reffile.description = descrip
         model.meta.reffile.pedigree = pedigree
         model.meta.reffile.useafter = useafter
-        model.meta.exposure.type = 'ANY' 
+        model.meta.exposure.type = 'ANY'
         model.meta.subarray.name = 'GENERIC'
 
         model.meta.photometry.pixelarea_steradians = self.pixar_sr
@@ -809,12 +828,12 @@ class Photom:
 
     def synphot_calcs(self, bpfile):
         """
-        Calculate zeropoint for a given bandpass in several 
+        Calculate zeropoint for a given bandpass in several
         photometric systems
 
         Arguments:
         ----------
-        bpfile -- Text file containing the throuput table for 
+        bpfile -- Text file containing the throuput table for
                   a single bandpass
 
         Returns:
@@ -823,8 +842,8 @@ class Photom:
         photflam, photfnu, and megajansky. Also returns pivot wavelength
         """
         # Define wavelength list to use
-        #wave_bins = np.arange(0.5, 5, 0.1) * u.micron
-        
+        wave_bins = np.arange(0.5, 5, 0.01) * u.micron
+
         # Use refactored synphot to calculate zeropoints
         orig_bp = SpectralElement.from_file(bpfile)
 
@@ -850,22 +869,22 @@ class Photom:
     def pysynphot_calcs(self,bpfile):
         """NOT USED"""
         #Use pysynphot to calculate zeropoints
-        
+
         #read in bandpass file
         bp = S.FileBandpass(bpfile)
 
         #convert to angstroms, to match the source spectrum
         bp.convert('Angstrom')
-    
+
         #calculate the pivot wavlength, return to microns
         pivot = round(bp.pivot())/10000.
 
         #renormalize the source spectrum to 1 count/sec in the bandpass
-        sp_zeropoint = self.src_spectrum.renorm(1,'counts',bp)  
-    
+        sp_zeropoint = self.src_spectrum.renorm(1,'counts',bp)
+
         #create observation
         obs_zeropoint = S.Observation(sp_zeropoint, bp)
-    
+
         #verify that the countrate is 1 count/sec
         countrateFullAperture_zeropoint = obs_zeropoint.countrate()
         cr = np.absolute(1.-countrateFullAperture_zeropoint)
@@ -875,7 +894,7 @@ class Photom:
             print('expecting countrate of 1.0, found countrate of {}.'.
                   format(countrateFullAperture_zeropoint))
             sys.exit()
-    
+
         #zeropoint = magnitude that gives 1 count per second
         vzp = obs_zeropoint.effstim('vegamag')
         azp = obs_zeropoint.effstim('abmag')
@@ -885,7 +904,7 @@ class Photom:
         jy = obs_zeropoint.effstim('Jy')
 
         return (vzp,azp,szp,flambda,fn,jy)
-        
+
 
     def make_pam(self):
         """Create pixel area map reference file"""
@@ -895,7 +914,7 @@ class Photom:
         if ((self.xcoeffs is None) | (self.ycoeffs is None)):
             print("Getting coefficients from SIAF")
             self.xcoeffs, self.ycoeffs = self.get_coefficients()
-        
+
         # Get the pixel area if it was not
         # previously defined
         if self.pixel_area_a2 is None:
@@ -904,48 +923,47 @@ class Photom:
             self.pixel_area_a2 = self.get_pixel_area()
 
         if self.pixel_area_sr is None:
-            sterrad_per_arcsec2 = (1. / 3600. * np.pi / 180.)**2
-            self.pixel_area_sr = self.pixel_area_a2 * sterrad_per_arcsec2
-        
+            self.pixel_area_sr = self.pixel_area_a2.to(u.steradian)
+
         # Get order
         order = self.get_order(self.xcoeffs)
 
         # Run Jacobian to get area
         coords = np.mgrid[-1024:1024,-1024:1024]
-        ycoords = coords[0,:,:] 
+        ycoords = coords[0,:,:]
         xcoords = coords[1,:,:]
         map = polynomial.jacob(self.xcoeffs, self.ycoeffs, xcoords, ycoords, order)
         yd,xd = map.shape
         print('Pixel area from Jacob at {},{}: {}'.format(yd/2, xd/2, map[yd/2, xd/2]))
         print('Manually calculated reference location pixel area: {}'.format(self.pixel_area_a2))
 
-        test_ratio = map[yd/2, xd/2] / self.pixel_area_a2 #should be 1.0
+        test_ratio = map[yd/2, xd/2] / self.pixel_area_a2.value #should be 1.0
         print('Ratio of areas at 1024,1024 (should be 1.0): {}'.format(test_ratio))
-        
-        map /= self.pixel_area_a2
+
+        map /= self.pixel_area_a2.value
         self.save_pam(map)
 
-        
+
     def save_pam(self,pixmap):
         """
         Save pixel area map in correct reffile format
 
         Arguments:
         ----------
-        pixmap -- 2D array containing the pixel area map 
+        pixmap -- 2D array containing the pixel area map
 
         Returns:
         --------
         Nothing (but saves pixmap in PixelAreaModel file)
         """
         from jwst.datamodels import PixelAreaModel
-        
+
         detector = self.detector
         if '5' in self.detector:
             detector = self.detector.replace('5','LONG')
 
         model = PixelAreaModel(pixmap)
-        
+
         model.meta.author = self.author
         model.meta.filetype = 'AREA'
         model.meta.instrument.name = 'NIRCAM'
@@ -956,10 +974,10 @@ class Photom:
         model.meta.pedigree = self.pedigree
         model.meta.useafter = self.useafter
         model.meta.exposure.type = 'NRC_IMAGE'
-        model.meta.reftype = 'AREA' 
+        model.meta.reftype = 'AREA'
         model.meta.telescope = 'JWST'
-        model.meta.photometry.pixelarea_arcsecsq = self.pixel_area_a2
-        model.meta.photometry.pixelarea_steradians = self.pixel_area_sr
+        model.meta.photometry.pixelarea_arcsecsq = self.pixel_area_a2.value
+        model.meta.photometry.pixelarea_steradians = self.pixel_area_sr.value
         #model.meta.subarray.fastaxis = 1
         #model.meta.subarray.slowaxis = -2
         #model.meta.subarray.name = 'FULL'
@@ -977,7 +995,7 @@ class Photom:
 
         for s in stringlist:
             model.history.append(s)
-        
+
         if self.pam_outfile is None:
             self.pam_outfile = 'NIRCam_{}_PAM.fits'.format(detector)
         model.save(self.pam_outfile)
@@ -991,7 +1009,7 @@ class Photom:
         Arguments:
         ----------
         full -- String to be chopped
-        length -- Length of substrings into which the full string 
+        length -- Length of substrings into which the full string
                   is chopped
 
         Returns:
@@ -1031,13 +1049,8 @@ class Photom:
 
     def get_coefficients(self):
         """Retrieve polynomial coefficeints from SIAF"""
-        xc = []
-        yc = []
-        for col in self.siaf_row.colnames:
-            if 'Sci2IdlX' in col:
-                xc.append(self.siaf_row[col].data.data[0])
-            if 'Sci2IdlY' in col:
-                yc.append(self.siaf_row[col].data.data[0])
+        xc = self.siaf.get_polynomial_coefficients()['Sci2IdlX']
+        yc = self.siaf.get_polynomial_coefficients()['Sci2IdlY']
         return xc, yc
 
 
@@ -1091,7 +1104,7 @@ if __name__ == '__main__':
     photom = Photom()
     parser = photom.add_options(usage = usagestring)
     args = parser.parse_args(namespace=photom)
-    photom.get_siaf_row()
+    #photom.get_siaf_row()
 
     if args.pam_only:
         photom.make_pam()
