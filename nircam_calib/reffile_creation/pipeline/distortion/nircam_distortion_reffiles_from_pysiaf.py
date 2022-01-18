@@ -26,16 +26,18 @@ in units of arcseconds from the refrence pixel.
 from asdf import AsdfFile
 from astropy.modeling.models import Polynomial2D, Mapping, Shift
 import astropy.units as u
-from jwst.datamodels import DistortionModel, util
+from jwst.datamodels import DistortionModel
+from stdatamodels import util
 from mirage.utils.siaf_interface import sci_subarray_corners
 import numpy as np
 import pysiaf
 
-import read_siaf_table
+#mport read_siaf_table
 
 
 def create_nircam_distortion(detector, aperture, outname, sci_pupil,
-                             sci_subarr, sci_exptype, history_entry):
+                             sci_subarr, sci_exptype, history_entry,
+                             siaf_xml_file=None):
     """
     Create an asdf reference file with all distortion components for the NIRCam imager.
 
@@ -52,6 +54,9 @@ def create_nircam_distortion(detector, aperture, outname, sci_pupil,
         Name of the aperture/subarray. (e.g. FULL, SUB160, SUB320, SUB640, GRISM_F322W2)
     outname : str
         Name of output file.
+    siaf_xml_file : str
+        Name of SIAF xml file to use in place of the default SIAF version from pysiaf.
+        If None, the default version in pysiaf will be used.
 
     Examples
     --------
@@ -67,8 +72,15 @@ def create_nircam_distortion(detector, aperture, outname, sci_pupil,
     full_aperture = detector + '_' + aperture
 
     # Get Siaf instance for detector/aperture
-    inst_siaf = pysiaf.Siaf('nircam')
+    if siaf_xml_file is None:
+        print('Using default SIAF version in pysiaf.')
+        inst_siaf = pysiaf.Siaf('nircam')
+    else:
+        print(f'SIAF to be loaded from {siaf_xml_file}...')
+        inst_siaf = pysiaf.Siaf(filename=siaf_xml_file, instrument='nircam')
+
     siaf = inst_siaf[full_aperture]
+
 
     # Find the distance between (0,0) and the reference location
     xshift, yshift = get_refpix(inst_siaf, full_aperture)
@@ -189,10 +201,10 @@ def create_nircam_distortion(detector, aperture, outname, sci_pupil,
     d.meta.pedigree = 'GROUND'
     d.meta.reftype = 'DISTORTION'
     d.meta.author = 'B. Hilbert'
-    d.meta.litref = "https://github.com/spacetelescope/jwreftools"
-    d.meta.description = "Distortion model from SIAF coefficients in pysiaf version 0.6.1"
+    d.meta.litref = "https://github.com/spacetelescope/nircam_calib"
+    d.meta.description = "Complete distortion model for coronagraphic apertures, using SIAF coefficients in PRDOPSSOC-041"
     #d.meta.exp_type = exp_type
-    d.meta.useafter = "2014-10-01T00:00:00"
+    d.meta.useafter = "2014-10-01T00:00:01"
 
     # To be ready for the future where we will have filter-dependent solutions
     d.meta.instrument.filter = 'N/A'
@@ -200,8 +212,8 @@ def create_nircam_distortion(detector, aperture, outname, sci_pupil,
     # Create initial HISTORY ENTRY
     sdict = {'name': 'nircam_distortion_reffiles_from_pysiaf.py',
              'author': 'B.Hilbert',
-             'homepage': 'https://github.com/spacetelescope/jwreftools',
-             'version': '0.8'}
+             'homepage': 'https://github.com/spacetelescope/nircam_calib',
+             'version': '0.0'}
 
     entry = util.create_history_entry(history_entry, software=sdict)
     d.history = [entry]
