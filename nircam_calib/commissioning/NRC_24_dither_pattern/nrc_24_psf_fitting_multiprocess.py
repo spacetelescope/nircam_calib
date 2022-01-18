@@ -74,8 +74,8 @@ def psf_fit(data_array, pheader, fheader, data_file, psf_grid, siaf):
 	sources = daofind(data_array - median) 
 	
 	# And now, let's make some cuts to remove objects that are too faint or too bright
-	flux_min = 5
-	flux_max = 50
+	flux_min = 5#5 #0
+	flux_max = 50#50 #1000
 	flux_range = np.where((sources['flux'] > flux_min) & (sources['flux'] < flux_max))[0]
 	
 	init_tbl = Table()
@@ -83,11 +83,20 @@ def psf_fit(data_array, pheader, fheader, data_file, psf_grid, siaf):
 	init_tbl['y_0'] =  sources['ycentroid'][flux_range]
 	init_tbl['flux_0'] =  sources['flux'][flux_range]
 	
+	# And now, let's make a plot of the original image.  
+	plt.figure(figsize=(9, 9))
+	imshow_norm(data_array, interval=PercentileInterval(99.), stretch=SqrtStretch())
+	plt.colorbar()
+	plt.savefig(data_file+'.png', dpi=300)
+	plt.clf()
+
 	# And now, let's make a plot of the image showing the positions of the objects. 
 	plt.figure(figsize=(9, 9))
 	imshow_norm(data_array, interval=PercentileInterval(99.), stretch=SqrtStretch())
 	plt.scatter(init_tbl['x_0'], init_tbl['y_0'], s=10, color = 'black')
+	plt.colorbar()
 	plt.savefig(data_file+'_with_daostarfinder_objects.png', dpi=300)
+	plt.clf()
 
 	eval_xshape = int(np.ceil(psf_grid.data.shape[2] / psf_grid.oversampling))
 	eval_yshape = int(np.ceil(psf_grid.data.shape[1] / psf_grid.oversampling))
@@ -119,6 +128,9 @@ def psf_fit(data_array, pheader, fheader, data_file, psf_grid, siaf):
 	tbl['y_0_unc'].format = '%.4e'
 	
 	diff = phot.get_residual_image()
+	hdu_out = fits.PrimaryHDU(diff, header = fheader)
+	hdul_out = fits.HDUList([hdu_out])
+	hdul_out.writeto(data_file+'_residual.fits')
 	
 	# And create a residual image from the fit 
 	plt.figure(figsize=(9, 9))
@@ -126,6 +138,7 @@ def psf_fit(data_array, pheader, fheader, data_file, psf_grid, siaf):
 	#plt.scatter(tbl['x_fit'], tbl['y_fit'], s=80, facecolors='none', edgecolors='r')
 	plt.colorbar()
 	plt.savefig(data_file+'_residual.png', dpi=300)
+	plt.clf()
 	
 	RA_fit = np.zeros(len(tbl['x_fit']))
 	DEC_fit = np.zeros(len(tbl['x_fit']))
@@ -142,14 +155,16 @@ def main():
 	# Here's the path to the data 
 	data_path = '/data1/car_24_apt_01073/mirage/reduced/'
 
-	data_files = ['jw01073001001_01101_00001_nrca1_cal',
-		'jw01073001001_01101_00002_nrca1_cal',
-		'jw01073001002_01101_00003_nrca1_cal',
-		'jw01073001002_01101_00004_nrca1_cal',
-		'jw01073001003_01101_00005_nrca1_cal',
-		'jw01073001003_01101_00006_nrca1_cal',
-		'jw01073001004_01101_00007_nrca1_cal',
-		'jw01073001004_01101_00008_nrca1_cal']
+	nrc_sca = 'nrca1'
+
+	data_files = ['jw01073001001_01101_00001_'+nrc_sca+'_cal',
+		'jw01073001001_01101_00002_'+nrc_sca+'_cal',
+		'jw01073001002_01101_00003_'+nrc_sca+'_cal',
+		'jw01073001002_01101_00004_'+nrc_sca+'_cal',
+		'jw01073001003_01101_00005_'+nrc_sca+'_cal',
+		'jw01073001003_01101_00006_'+nrc_sca+'_cal',
+		'jw01073001004_01101_00007_'+nrc_sca+'_cal',
+		'jw01073001004_01101_00008_'+nrc_sca+'_cal']
 
 	# Let's load in the first file 
 	#hdu = fits.open('jw01073001001_01101_00001_nrca1_cal.fits')
@@ -158,7 +173,12 @@ def main():
 	# Let's start by loading up the psf grid, which will be 3x3 for now. 
 	nrc = webbpsf.NIRCam()
 	nrc.filter = hdu[0].header['FILTER']#"F150W"
-	nrc.detector = hdu[0].header['DETECTOR']#'NRCA3'
+	if (hdu[0].header['DETECTOR'] == 'NRCALONG'):
+		nrc.detector = 'NRCA5'
+	elif (hdu[0].header['DETECTOR'] == 'NRCBLONG'):
+		nrc.detector = 'NRCB5'
+	else:
+		nrc.detector = hdu[0].header['DETECTOR']#'NRCA3'
 	#nrc_grid = nrc.psf_grid(num_psfs=9, all_detectors=False)
 	nrc_grid = nrc.psf_grid(num_psfs=25, all_detectors=False, fov_pixels=33, oversample=2)
 
@@ -167,7 +187,7 @@ def main():
 	
 	# Now, let's spawn processes that will run on the various images.
 
-	number_of_processes_at_the_same_time = 8
+	number_of_processes_at_the_same_time = 1
 
 	# Create an instance of siaf to pass through along to the psf_fit function. 
 	siaf = pysiaf.Siaf('NIRCam')
