@@ -178,7 +178,8 @@ if __name__ == '__main__':
         angle_list.append(angle)
 
     median_angle = np.median(angle_list)
-    print(f'Median angle of trace relative to rows/cols: {median_angle} degrees.')
+    stdev_angle = np.stdev(angle_list)
+    print(f'Median and stdev of trance angles relative to rows/cols: {median_angle} +/- {stdev_angle} degrees.')
 
     if horiz:
         results = Table([coord2_src1, src1_list, coord2_src2, src2_list, diff_list, dx_list, angle_list],
