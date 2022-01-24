@@ -1,0 +1,126 @@
+scripts for CAR/CAP 24  APT 01073 Dither Pattern verification
+
+The path to DMS/NCDHAs reductions ("root_dir") is currently hard-coded 
+and will need to be changed in the scripts.
+
+requires photutils, sep, numpy, matplotlib, re, os, sys
+
+
+#--------------------------------------------------------------------------
+
+average_psf.py
+Script that uses the slope, rate/cal and i2d files to calculate an average
+PSF.
+
+# Example
+# calculate the average PSF for a DMS Stage2 cal image and plot the average PSF
+# 
+average_psf.py --file /home/cnaw/commissioning/car_24_apt_01073/mirage/reduced/jw01073006001_01101_00001_nrcb3_cal.fits  --plot
+
+#--------------------------------------------------------------------------
+
+plot_profiles.py
+Plot the surface brightness profiles calculated by single_psf.py
+# examples:
+# help
+plot_profiles.py -h
+
+# plot profiles from all visits in observation 1 of CAR 24 (APT 1073) for SCA A5 :
+plot_profiles.py  --sca a5 --sim guitarra --type i2d --filter F277W --obs 001 --car 24
+
+# plot profiles from all visits and observations of CAR 24 for SCA A3 :
+plot_profiles.py  --sca a3 --sim mirage --type cal --filter F115W
+
+#--------------------------------------------------------------------------
+
+profile_batch.pl
+
+Perl script which runs the profile calculation (single_psf.py) for all images
+that satisfy the combination of simulation + (reduced) image type. 
+
+Examples:
+./run_profile_batch.pl mirage cal
+
+./run_profile_batch.pl guitarra cal
+
+./run_profile_batch.pl templates
+
+#--------------------------------------------------------------------------
+
+psf_profile.py (no input parameters)
+
+compare the PSF profile derived from thw WebbPSF template, ISIM CV3 images
+reduced using IRAF, Fortran code and photutils for the F115W filter.
+This checks that different codes produce consistent results.
+
+#--------------------------------------------------------------------------
+
+psf_template_mp.py
+Is the front-end of the scripts that calculate the average PSF
+for a given image. The front-end will define the files that should
+be analysed and manage the multi-processing queue. The analysis
+itself uses  the average_psf.py script to build the average
+PSF using the data ( which can also calculate the PSF-photometry,
+currently commented out.
+The script will process the output from Stage2 or Stage3 (or even Stage1)
+of the DMS reduction.
+
+
+Examples
+psf_template_mp.py -h
+
+# calculate the average templates using 10 CPUs for DMS Stage 2 i2d image. Show plots
+# and overwrite if reduced file already exists in the target directory:
+psf_template_mp.py --ncpu 10 --sim mirage --type i2d  --target_dir ~/car_24/ --plot --overwrite
+
+# calculate average templates using a single CPU for mirage  DMS Stage 2  cal files,
+# but making no plots. DO not overwrite reduced file if it exists:
+psf_template_mp.py --ncpu 1 --type cal  --target_dir ~/car_24/
+
+
+#--------------------------------------------------------------------------
+
+single_psf.py
+Derive the surface brightness profile for the average PSFs calculated by
+average_psf.py.
+
+examples:
+# calculate the profile using SEP to determine the centroid and plot results for a guitarra
+# simulation reduced using DMS for an i2d file
+single_psf.py --file /home/cnaw/commissioning/car_24_apt_01073/guitarra/analysis/jw01073001001_01101_00001_nrca5_F277W_01_01_i2d_F277W_psf.fits  --plot --use_sep
+
+# calculate the profile using the photutils source detection methods, without plotting results
+single_psf.py --file /home/cnaw/commissioning/car_24_apt_01073/mirage/analysis/mirage/analysis/jw01073006001_01101_00002_nrca2_cal_F070W_psf.fits
+
+
+#--------------------------------------------------------------------------
+#--------------------------------------------------------------------------
+#============================================================================
+The reduction can be streamlined by running
+
+# Use average_psf.py to calculate the reconstructed PSF for individual image
+# in multi-processing mode:
+1) psf_template_mp.py --ncpu 10 --sim mirage --type cal --target_dir ~/car_24/ --overwrite
+
+# run single_psf.py on all observations(+visits+filters+SCAs) of an APT :
+2a) profile_batch.pl mirage cal
+
+or to run in parallel mode (not a huge gain)
+
+2b) profile_batch.pl mirage cal
+followed by
+2c) ./paralle.pl profile.batch
+
+
+
+# Plot profiles for all visits of observation 002 using SCA a3 with F115W
+3a) plot_profiles.py --sca a3  -sim mirage --type cal --filter F115W --obs 002 --car 24
+
+or for all observations 
+
+3b) plot_profiles.py --sca a3  -sim mirage --type cal --filter F115W --obs 00* --car 24
+
+or run a non-interactive batch creating PNG files only for all files:
+all SCAs, filters, simulations (mirage/guitarra) and file types (cal/i2d/slp)
+
+3c) plot_profile_batch.pl
