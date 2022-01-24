@@ -1,7 +1,9 @@
 scripts for CAR/CAP 24  APT 01073 Dither Pattern verification
 
 The path to DMS/NCDHAs reductions ("root_dir") is currently hard-coded 
-and will need to be changed in the scripts.
+and will need to be changed in the scripts. Creating the enviroment variable
+CAR_ROOT
+is an attempt to overcome this.
 
 requires photutils, sep, numpy, matplotlib, re, os, sys
 
