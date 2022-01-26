@@ -5,6 +5,7 @@ use warnings;
 my $batch_file = 'profile.batch';
 my $car_root;
 my $command;
+my $cutoff = 0.0;
 my $file ;
 my $host;
 my $overwrite = 1;
@@ -16,8 +17,9 @@ my $show_plot    = 'false' ;
 my $use_sep      = 'true' ;
 my @list ;
 if($#ARGV <= -1) {
-    print "./run_profile_batch.pl mirage cal\n./run_profile_batch.pl guitarra cal\n";
-    print "./run_profile_batch.pl templates\n";
+    print "./run_profile_batch.pl mirage cal\n";
+    print "./run_profile_batch.pl guitarra cal parallel\n";
+    print "./run_profile_batch.pl templates parallel\n";
     exit(0);
 }
 my $sim = $ARGV[0];
@@ -25,10 +27,11 @@ if($sim ne 'templates') {
     $type = $ARGV[1];
 }
 my $parallel = 0;
-if($#ARGV == 2){
-    $parallel = 1;
+for(my $ii = 2; $ii <= $#ARGV; $ii++){
+    if(lc($ARGV[$ii]) eq 'parallel') {
+	$parallel = 1;
+    }
 }
-
 #
 $host = $ENV{HOST};
 print "host is $host\n";

@@ -47,7 +47,7 @@ from sub_profile import *
 #-----------------------------------------------------------------------
 def single_psf(file, plot_results=False, use_sep=False, debug=False):
     norm_profile = True
-    
+        
     # Centroid search parameters
     print("\nsingle_psf.py: file is ",file)
     if(debug == 1 or debug == True):
@@ -82,7 +82,7 @@ def single_psf(file, plot_results=False, use_sep=False, debug=False):
 
     print("single_psf.py: pixel_scale, filter, oversampling_rate : ", pixel_scale, filter, oversampling_rate)
     output = re.sub('.fits','_prof.fits',file)
-
+        
     print("single_psf.py: output file is ", output)
     print("single_psf.py: png    file is ", output1)
 
@@ -110,19 +110,21 @@ def single_psf(file, plot_results=False, use_sep=False, debug=False):
     rsky  = [rmax-nsky, rmax]
     objmax = rsky[0] - 1
     #    if(debug == 1 or debug == True):
-    print("naxis1, naxis2 ",naxis1, naxis2)
 
     nr = int((objmax/dr))-1
     fcenter = image[int(yc),int(xc)]
-    print("at line ", lineno(), 'xc, yc, rmax, nr ',xc, yc, rmax, nr,fcenter)
+#    print("naxis1, naxis2 ",naxis1, naxis2)
+#    print("at line ", lineno(), 'xc, yc, rmax, nr ',xc, yc, rmax, nr,fcenter)
     radii = []
     for index in range(0,nr):
         radii.append((index+1) * dr)
 
     nradii = len(radii)
 
-    (apflux, area, diff) = aper_phot(image, nan_mask, xc, yc, radii, rsky, debug)
-    diff,encircled = differential(apflux, area, norm_profile)
+    (apflux, area) = aper_phot(image, nan_mask, xc, yc, radii, rsky, debug)
+    diff,encircled0 = differential(apflux, area, norm_profile, True)
+    diff,encircled1 = differential(apflux, area, norm_profile, False)
+
     # print(lineno()," radii ", radii)
 
     rt        = []
@@ -136,23 +138,25 @@ def single_psf(file, plot_results=False, use_sep=False, debug=False):
         print("single_psf.py: xmax, ymax, rmax ",xmax, ymax, rmax)
         print("single_psf.py: rsky ", rsky)
         print("single_psf.py: nr ", nr, len(rt))
-        print("single_psf.py: len(rt), len(encircled)",len(rt), len(encircled))
+        print("single_psf.py: len(rt), len(encircled0)",len(rt), len(encircled0))
         # print("single_psf.py: rat", len(rt),rt)
 
     a1 = np.array(rt)
     a2 = np.array(area)
     a3 = np.array(diff)
     a4 = np.array(apflux)
-    a5 = np.array(encircled)
+    a5 = np.array(encircled0)
     a6 = np.array(radii)
-
+    a7 = np.array(encircled1)
+    
     col1 = fits.Column(name='r',format='E', unit='arcsec',array=a1)
     col2 = fits.Column(name='area',format='E',unit='pixel**2', array=a2)
     col3 = fits.Column(name='flux_r',format='E',unit='counts/s', array=a3)
     col4 = fits.Column(name='flux_t',format='E',unit='counts/s', array=a4)
-    col5 = fits.Column(name='encircled',format='E', unit=' ',array=a5)
+    col5 = fits.Column(name='encircled0',format='E', unit='flux/arcsec^2',array=a5)
     col6 = fits.Column(name='rpix',format='E', unit='pixel',array=a6)
-    cols = fits.ColDefs([col1, col2, col3, col4, col5,col6])
+    col7 = fits.Column(name='encircled1',format='E', unit='flux/arcsec^2',array=a7)
+    cols = fits.ColDefs([col1, col2, col3, col4, col5,col6, col7])
     hdu  = fits.BinTableHDU.from_columns(cols)
     hdu.writeto(output,overwrite=True)
 
@@ -166,7 +170,8 @@ def single_psf(file, plot_results=False, use_sep=False, debug=False):
     plt.xlabel("radius (arc sec)")
     plt.ylabel("Normalized encircled flux (==dflux(i)/flux(i)")
     plt.title(filter+" "+file)
-    plt.plot(rt, encircled,'o', color='brown')
+    plt.plot(rt, encircled0,'o', color='brown')
+    plt.plot(rt, encircled1,'x', color='blue')
     png_plot = re.sub('.fits','.png',output1)
     plt.savefig(png_plot,bbox_inches='tight')
 
@@ -197,6 +202,7 @@ if __name__ == "__main__":
                         action="store_true")
     parser.add_argument("--use_sep", help="use SEP for object detection",
                         action="store_true")
+    
     parser.add_argument("--debug", help="debug mode", action="store_true")
     args = parser.parse_args()
 

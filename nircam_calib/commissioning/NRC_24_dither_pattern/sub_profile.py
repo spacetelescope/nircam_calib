@@ -132,37 +132,6 @@ def scale_from_filename(file):
 
     return pixel_scale, filter
 #
-#------------------------------------------------------------------------
-#   push(@x, $radius);
-#    push(@y, $flux);
-#    push(@sb, $flux/$sarea);
-#    push(@area,$sarea);
-#    if($i == 0) {
-#        push(@z, $flux);
-#        $df = $flux;
-#        $xx = $df/$sarea;
-#    } else {
-#        $df = $flux - $y[$i-1];
-#        push(@z, $df);
-#        $xx = $df/($sarea-$area[$i-1]);
-#    }
-#    push(@intensity, log10($xx));
-
-def differential(apmag,area, norm):
-    diff         = np.zeros(len(apmag))
-    encircled    = np.zeros(len(apmag))
-    diff[0]      = apmag[0]
-    encircled[0] = apmag[0]/area[0]
-#    ii = 0
-#    print(apmag[ii], diff[ii], area[ii], encircled[ii])
-    for ii in range(1,len(apmag)):
-        diff[ii]= apmag[ii]-apmag[ii-1]
-        encircled[ii] = diff[ii]/(area[ii]-area[ii-1])
-#        print(apmag[ii], diff[ii], area[ii], encircled[ii])
-    if(norm == True or norm == 1) :
-        diff = diff/diff[0]
-        encircled = encircled/encircled[0]
-    return diff, encircled
 #
 #------------------------------------------------------------------------
 #
@@ -266,7 +235,7 @@ def read_image(file, debug):
                 break
 #        print("at line ", lineno(), " ii ", ii)
 
-    print("sub_profile line ",lineno()," samp_rate, filter, pixel_scale",samp_rate, filter, pixel_scale)
+#    print("sub_profile line ",lineno()," samp_rate, filter, pixel_scale",samp_rate, filter, pixel_scale)
     return image, header, samp_rate, filter, pixel_scale
 #
 #------------------------------------------------------------------------
@@ -301,7 +270,7 @@ def read_webbpsf_ext(tempfile, ext, template_r, norm_profile, debug):
     
     rskyt= [xct-11., xct-1.]
     #
-    (apmagt, areat, difft) = aper_phot(template, tempmask, xct, yct, template_r, rskyt, debug)
+    (apmagt, areat) = aper_phot(template, tempmask, xct, yct, template_r, rskyt, debug)
     difft, encircledt = differential(apmagt, areat, norm_profile)
     # print(lineno()," radii ", radii)
     rt = []
@@ -463,7 +432,6 @@ def run_sep(file, ext, nsigma, debug, plot_results=False):
         plt.show()
 
     return xc, yc
-#
 #------------------------------------------------------------------------
 #
 def aper_phot(image, mask, xc, yc, radii, rsky, debug):
@@ -514,8 +482,30 @@ def aper_phot(image, mask, xc, yc, radii, rsky, debug):
             area_list.append(apertures[n].area)
     apflux = np.array(junk)
     area  = np.array(area_list)
-    diff  = differential(apflux,area,True)
-    return apflux, area, diff
+#    (diff, encircled)  = differential(apflux,area,True,False)
+    return apflux, area
 #
 #------------------------------------------------------------------------
 #
+def differential(apmag,area, norm, by_peak=True):
+    diff         = np.zeros(len(apmag))
+    encircled    = np.zeros(len(apmag))
+    diff[0]      = apmag[0]
+    encircled[0] = apmag[0]/area[0]
+    sum          = encircled[0]
+    ii = 0
+    for ii in range(1,len(apmag)):
+        diff[ii]= apmag[ii]-apmag[ii-1]
+        encircled[ii] = diff[ii]/(area[ii]-area[ii-1])
+        sum = sum + encircled[ii]
+    if(norm == True or norm == 1) :
+#        print("sub_profile at line ", lineno(),"peak, integral, by_peak", encircled[0],  sum, by_peak)
+        diff = diff/diff[0]
+        if(by_peak == True):
+            encircled = encircled/encircled[0]
+        else:
+            encircled = encircled/sum
+
+    return diff, encircled
+#
+#------------------------------------------------------------------------

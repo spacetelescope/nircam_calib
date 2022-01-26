@@ -122,7 +122,7 @@ mask[bad] = True
 ext = 0
 (xc0, yc0) = run_sep(file[0] ,ext, nsigma, debug,plot_results=False)
 print("entering aper_phot")
-(apmag0, area0, diff0) = aper_phot(image, mask, xc0, yc0, radii, rsky, debug)
+(apmag0, area0) = aper_phot(image, mask, xc0, yc0, radii, rsky, debug)
 diff0,encircled0 = differential(apmag0,area0, norm_profile)
 radii0 =[]
 for ii in range(0,len(radii)):
@@ -141,7 +141,7 @@ mask[bad] = True
 #xc1, yc1 = find_centroid(image, fwhm, nsigma, debug)
 ext = 0
 (xc1, yc1) = run_sep(file[1] ,ext, nsigma, debug,plot_results=False)
-(apmag1, area1,diff1) = aper_phot(image, mask, xc1, yc1, radii, rsky, debug)
+(apmag1, area1) = aper_phot(image, mask, xc1, yc1, radii, rsky, debug)
 diff1,encircled1 = differential(apmag1, area1, norm_profile)
 radii1 =[]
 for ii in range(0,len(radii)):

@@ -107,7 +107,7 @@ The reduction can be streamlined by running
 # run single_psf.py on all observations(+visits+filters+SCAs) of an APT :
 2a) profile_batch.pl mirage cal
 
-or to run in parallel mode (not a huge gain)
+or to run in parallel mode
 
 2b) profile_batch.pl mirage cal
 followed by

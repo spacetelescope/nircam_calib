@@ -80,7 +80,7 @@ $pm->run_on_start( sub {
 #
 NAMES:
 foreach my $child ( 0 .. $#names ) {
-  sleep 2; # delay by 2 seconds to make sure random numbers are different
+#  sleep 2; # delay by 2 seconds to make sure random numbers are different
   my $pid = $pm->start($names[$child]) and next NAMES;
  
 # This code is the child process
@@ -89,7 +89,7 @@ foreach my $child ( 0 .. $#names ) {
 # this is where one should place the commands to run
 
   $command = $code[$child];
-  print "at line : ",__LINE__," run $command\n";
+  print "parallel.pl at line : ",__LINE__," run $command\n";
   system($command);
 
 #  $command = $code[$child*2+1];
