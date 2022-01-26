@@ -9,7 +9,7 @@ nrc_a_apertures = ['NRCA{}_FULL'.format(i+1) for i in range(5)]
 nrc_b_apertures = ['NRCB{}_FULL'.format(i+1) for i in range(5)]
 nrc_apertures = nrc_a_apertures + nrc_b_apertures
 
-hist = ("This reference file was created from the distortion coefficients contained in pysiaf "
+hist = ("XXXXXTEST TESTXXXXXThis reference file was created from the distortion coefficients contained in pysiaf "
         "(and therefore the PRD) as of 24 Oct 2019. This includes the fix for the round trip (V2,V3 -> x,y -> V2, V3) error "
         "present in previous versions of the coefficients. This update is described in JIRA issues: "
         "JWSTSIAF-161, JWSTSIAF-123. pysiaf version 0.6.1 was used to access the appropriate "
@@ -18,15 +18,15 @@ hist = ("This reference file was created from the distortion coefficients contai
 
 #basedir = 'reference_files/distortion/24Oct2019_round_trip_error_fixed'
 
-hist = ("This reference file was created from the distortion coefficients contained in pysiaf "
+hist = ("XXXXTEST TESTXXXXThis reference file was created from the distortion coefficients contained in pysiaf "
         "version 0.13.0, which uses "
         "version 39 of the PRD. This version of the PRD makes use of the new <detector>_FULL_WEDGE_RND"
         "and <detector>_FULL_WEDGE_BAR parent apertures for coronagraphic observations. All "
         "distortion coefficients are calculated from ground based data.")
 
 
-basedir = '/grp/jwst/wit/nircam/reference_files/distortion/coron_distortion_files_2021_Sept'
-
+#basedir = '/grp/jwst/wit/nircam/reference_files/distortion/coron_distortion_files_2021_Sept'
+basedir = '/Users/hilbert/python_repos/distortion_reffile_creation_from_johannes_code'
 # IMAGING metadata-----------------------------------------------
 sw_imaging_pupil = ['CLEAR', 'F162M', 'F164N', 'GDHS0', 'GDHS60', 'WLM8', 'WLP8', 'PINHOLES', 'MASKIPR', 'FLAT']
 lw_imaging_pupil = ['CLEAR', 'F323N', 'F405N', 'F466N', 'F470N', 'PINHOLES', 'MASKIPR', 'GRISMR', 'GRISMC', 'FLAT']
@@ -39,7 +39,7 @@ sw_exptype = ['NRC_IMAGE', 'NRC_TSIMAGE', 'NRC_FLAT', 'NRC_LED',
               'NRC_DARK', 'NRC_WFSS', 'NRC_TSGRISM', 'NRC_GRISM']
 lw_exptype = sw_exptype #+ ['NRC_WFSS', 'NRC_TSGRISM', 'NRC_GRISM']
 
-for aperture in nrc_apertures:
+for aperture in ['NRCB4_FULL']: #nrc_apertures:
     detector, apname = aperture.split('_')
     outname = os.path.join(basedir, '{}_distortion.asdf'.format(aperture))
 
@@ -54,8 +54,10 @@ for aperture in nrc_apertures:
         #subarr = lw_imaging_subarr
         subarr = ['GENERIC']
         exp_type = lw_exptype
-
-    #ref.create_nircam_distortion(detector, apname, outname, pupil, subarr, exp_type, hist)
+    ref.create_nircam_distortion(detector, apname, outname, pupil, subarr, exp_type, hist, author='Hilbert',
+                                 descrip=descrip, pedigree='GROUND', useafter='2014-10-01T00:00:01',
+                                 dist_coeffs_file='distortion_coeffs_nrcb4_full_f200w_clear_jw01144001001_01101_00001_nrcb4_cal.txt')
+stop
 
 # CORONAGRAPHY metadata------------------------------------------
 # For coronagraphy, we expect the bar and round wedges to have different astrometric solutions,
