@@ -14,6 +14,7 @@ import argparse
 
 import os, re, sys
 from glob import glob
+import inspect
 import multiprocessing as mp
 import numpy as np
 from os.path import exists
@@ -24,6 +25,13 @@ import scipy
 # Progress bar
 from tqdm.auto import tqdm
 import traceback
+#
+#------------------------------------------------------------------------
+#
+def lineno():
+    """Returns the current line number in our program."""
+    return inspect.currentframe().f_back.f_lineno
+#
 #
 #-----------------------------------------------------------------------
 #
@@ -38,9 +46,9 @@ def rand_val():
 #-----------------------------------------------------------------------
 #
 def reduce(args):
-    """This might work in place of `reduce`, but I don't know how `stellar_photometry` is coded"""
+    """This might work in place of `reduce`, but I don't know how `average_psf` is coded"""
 
-    import stellar_photometry
+    import average_psf
 
     file_to_read, target_dir, plot_results, overwrite, test = args
     try:
@@ -49,7 +57,7 @@ def reduce(args):
             import time
             time.sleep(1)
         else:
-            stellar_photometry.main(file_to_read, target_dir, plot_results=plot_results, overwrite=overwrite)
+            average_psf.main(file_to_read, target_dir, plot_results=plot_results, overwrite=overwrite)
 
         return True
     except Exception as e:
@@ -94,7 +102,7 @@ def run_multiprocess(func, worker_args, nsplit):
 #
 #-----------------------------------------------------------------------
 #
-def main(ncpu, target_dir, plot_results=False, overwrite=False, test=False):
+def main(ncpu, sim, type, target_dir, plot_results=False, overwrite=False, test=False):
     """Main function call"""
 
     ncpu_total = mp.cpu_count()
@@ -106,14 +114,40 @@ def main(ncpu, target_dir, plot_results=False, overwrite=False, test=False):
         ncpu = ncpu_total
 
     # Get files but first, what computer are we on ?
-    host = os.environ.get('HOST')
-    root_dir = './data/'
+    car_root = "None"
+    host     = os.environ.get('HOST')
+    car_root = os.environ.get('CAR_ROOT')
     if(host == 'ema.as.arizona.edu'):
-        root_dir   = '/home/cnaw/commissioning/car_24_apt_01073/'
-        target_dir = '/home/cnaw/commissioning/car_24_apt_01073/analysis/'
+        car_root   = '/home/cnaw/commissioning/car_24_apt_01073/'
+        if(sim == "mirage"):
+            root_dir   = car_root+'mirage/reduced/'
+            target_dir = car_root+'mirage/analysis/'
+        else:
+            root_dir   = car_root+'guitarra/'
+            root_dir   = car_root+'analysis/'
+            target_dir = car_root+'analysis/'
+
     if(host == 'orange.as.arizona.edu'):
-        root_dir   = '/data1/car_24_apt_01073/mirage/reduced/'
-        target_dir = '/data1/car_24_apt_01073/mirage/analysis/'
+        car_root   = '/data1/car_24_apt_01073/'
+        if(sim == "mirage"):
+            root_dir   = car_root+'mirage/reduced/'
+            target_dir = car_root+'mirage/analysis/'
+        else:
+            root_dir   = car_root+'guitarra/'
+            target_dir = car_root+'analysis/'
+            if(type == "slp"):
+                root_dir   = root_dir+'reduced/'
+            else:
+                root_dir   = root_dir+'st_reduced/'
+
+    print("at line ", lineno()," car_root is ", car_root)
+    if(car_root == None):
+#        car_root = '/data1/car_24_apt_01073/'
+        print("no car_root directory has been defined\n export CAR_ROOT=xxx\n")
+        return
+#        root_dir = car_root+'mirage/reduced/'
+#        car_psf  = target_dir
+
     status = exists(target_dir)
     
 # create analysis directory if it does not exist
@@ -125,7 +159,10 @@ def main(ncpu, target_dir, plot_results=False, overwrite=False, test=False):
     if test:
         files_to_read = ['example_file_{}'.format(i) for i in range(150)]
     else:
-        files_to_read = sorted(glob(root_dir+'*i2d.fits'))
+        if(type == "cal" or type == 'i2d'):
+            files_to_read = sorted(glob(root_dir+'*'+type+'.fits'))
+        else :
+            files_to_read = sorted(glob(root_dir+'*slp.fits'))
         
     # files_to_read = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight']
     nfiles = len(files_to_read)
@@ -152,14 +189,17 @@ def main(ncpu, target_dir, plot_results=False, overwrite=False, test=False):
 if __name__ == "__main__":
 
     # Use argument parser to pass keywords to program
-    parser = argparse.ArgumentParser(description="Run multiple instances of stellar_photometry.py")
+    parser = argparse.ArgumentParser(description="Run multiple instances of average_psf.py")
     parser.add_argument('--ncpu', help='Number of requested instances. Default = 4.', 
                         type=int, default=4)
+    parser.add_argument("--sim",help="guitarra or mirage", type=str,default="mirage")
+    parser.add_argument("--type",help=" DMS cal or i2d or NCDHAS slp (guitarra only)", type=str,default="cal")
+
     parser.add_argument("--target_dir", help="directory where results will be stored", type=str, default="./analysis/")
 
-    parser.add_argument("--plot", help="Plot results.", action="store_true")
+    parser.add_argument("--plot", help="set to plot results", action="store_true")
     parser.add_argument("--overwrite", help="Set to overwrite results.", action="store_true")
     parser.add_argument("--test", help="Testing. Skips run os.system() command. Fake file names.", action="store_true")
     args = parser.parse_args()
 
-    main(args.ncpu, args.target_dir, plot_results=args.plot, overwrite=args.overwrite, test=args.test)
+    main(args.ncpu, args.sim, args.type, args.target_dir, plot_results=args.plot, overwrite=args.overwrite, test=args.test)

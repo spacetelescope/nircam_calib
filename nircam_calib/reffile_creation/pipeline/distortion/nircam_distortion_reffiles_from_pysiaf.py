@@ -40,6 +40,7 @@ def create_nircam_distortion(detector, aperture, outname, sci_pupil,
                              sci_subarr, sci_exptype, history_entry,
                              author=None, descrip=None, pedigree=None,
                              useafter=None, dist_coeffs_file=None):
+                             siaf_xml_file=None):
     """
     Create an asdf reference file with all distortion components for the NIRCam imager.
 
@@ -58,6 +59,9 @@ def create_nircam_distortion(detector, aperture, outname, sci_pupil,
 
     outname : str
         Name of output file.
+    siaf_xml_file : str
+        Name of SIAF xml file to use in place of the default SIAF version from pysiaf.
+        If None, the default version in pysiaf will be used.
 
     sci_pupil : list
         Pupil wheel values for which this distortion solution applies
@@ -101,8 +105,15 @@ def create_nircam_distortion(detector, aperture, outname, sci_pupil,
     full_aperture = detector + '_' + aperture
 
     # Get Siaf instance for detector/aperture
-    inst_siaf = pysiaf.Siaf('nircam')
+    if siaf_xml_file is None:
+        print('Using default SIAF version in pysiaf.')
+        inst_siaf = pysiaf.Siaf('nircam')
+    else:
+        print(f'SIAF to be loaded from {siaf_xml_file}...')
+        inst_siaf = pysiaf.Siaf(filename=siaf_xml_file, instrument='nircam')
+
     siaf = inst_siaf[full_aperture]
+
 
     # Find the distance between (0,0) and the reference location
     xshift, yshift = get_refpix(inst_siaf, full_aperture)
