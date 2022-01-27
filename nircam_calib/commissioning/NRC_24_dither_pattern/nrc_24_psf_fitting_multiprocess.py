@@ -14,59 +14,14 @@ from photutils.detection import DAOStarFinder
 import webbpsf
 from webbpsf.gridded_library import display_psf_grid
 
+import jwst
+from jwst.datamodels import ImageModel
+
 import multiprocessing
 
-def convert_sci_to_sky(xsci, ysci, pheader, fheader, siaf):
-    """
-    Convert science pixel coordinates to RA/Dec
-
-    Uses header info from an input file to generate siaf aperture object,
-    and uses the pointing information to then create attitude matrix,
-    which combines with pysiaf distortion information to convert from 
-    'sci' pixel coordinates to 'sky' coorinates.
-    
-    Parameters
-    ==========
-    xsci : float or ndarray
-        pixel positions along x-axis ('sci' orientation of image)
-    ysci : float or ndarray
-        pixel positions along y-axis ('sci' orientation of image)
-    file : string
-        Location of DMS file containing necessary header info
-
-    Returns
-    =======
-    RA and Dec arrays.
-    """
-
-    #hdul = fits.open(file)
-    #pheader = hdul[0].header
-    #fheader = hdul[1].header
-    #hdul.close
-
-    # Get SIAF info
-    apername = pheader.get('APERNAME')
-    apsiaf = siaf[apername]
-
-    # V3 PA
-    pa_v3 = fheader.get('V3I_YANG')
-    # RA/Dec located at aperture reference position
-    ra_ref = fheader.get('RA_REF')
-    dec_ref = fheader.get('DEC_REF')
-    # V2/V3 aperture reference
-    v2_ref, v3_ref = apsiaf.reference_point('tel')
-
-    # Create attitude matrix
-    att = pysiaf.utils.rotations.attitude(v2_ref, v3_ref, ra_ref, dec_ref, pa_v3)
-    apsiaf.set_attitude_matrix(att)
-
-    # Conver to sky coordinates
-    ra_deg, dec_deg = apsiaf.convert(xsci, ysci, 'sci', 'sky')
-
-    return (ra_deg, dec_deg)
 
 # This is the function that actually runs the PSF fitting on the data files from the same SCA
-def psf_fit(data_array, pheader, fheader, data_file, psf_grid, siaf):
+def psf_fit(data_array, data_file, psf_grid, fheader, imagemodel):
 
 	# Let's run a quick fitting using DAOStarFinder
 	mean, median, std = sigma_clipped_stats(data_array, sigma=3.0) 
@@ -140,9 +95,10 @@ def psf_fit(data_array, pheader, fheader, data_file, psf_grid, siaf):
 	plt.savefig(data_file+'_residual.png', dpi=300)
 	plt.clf()
 	
+	# Calculate the RA and DEC values from the x_fit and y_fit values.
 	RA_fit = np.zeros(len(tbl['x_fit']))
 	DEC_fit = np.zeros(len(tbl['x_fit']))
-	RA_fit, DEC_fit = convert_sci_to_sky(tbl['x_fit'], tbl['y_fit'], pheader, fheader, siaf)
+	RA_fit, DEC_fit = imagemodel.meta.wcs(tbl['x_fit'], tbl['y_fit'])
 
 	tbl.add_column(DEC_fit, index=0, name='DEC_fit')
 	tbl.add_column(RA_fit, index=0, name='RA_fit')
@@ -167,7 +123,6 @@ def main():
 		'jw01073001004_01101_00008_'+nrc_sca+'_cal']
 
 	# Let's load in the first file 
-	#hdu = fits.open('jw01073001001_01101_00001_nrca1_cal.fits')
 	hdu = fits.open(data_path+data_files[0]+'.fits')
 
 	# Let's start by loading up the psf grid, which will be 3x3 for now. 
@@ -187,21 +142,19 @@ def main():
 	
 	# Now, let's spawn processes that will run on the various images.
 
-	number_of_processes_at_the_same_time = 1
-
-	# Create an instance of siaf to pass through along to the psf_fit function. 
-	siaf = pysiaf.Siaf('NIRCam')
+	number_of_processes_at_the_same_time = 8
 
 	process_list = []
 	for i in range(number_of_processes_at_the_same_time):
 		data_file_name = data_files[i]
 		hdu = fits.open(data_path+data_files[i]+'.fits')
+		image = ImageModel(data_path+data_files[i]+'.fits')
 		data_array = hdu[1].data
 		pheader = hdu[0].header
 		fheader = hdu[1].header
 		hdu.close()
 		#print(data_file_name)
-		p = multiprocessing.Process(target=psf_fit, args=(data_array, pheader, fheader, data_file_name, nrc_grid, siaf))
+		p = multiprocessing.Process(target=psf_fit, args=(data_array, data_file_name, nrc_grid, fheader, image))
 		p.start()
 		process_list.append(p)
 	
@@ -214,4 +167,3 @@ if __name__ == '__main__':
     print('starting main')
     main()
     print('finishing main')
-
