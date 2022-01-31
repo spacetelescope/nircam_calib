@@ -2,7 +2,12 @@ Readme file for:
 
 	NRC24_dither_offsets.py
 
-Anton M. Koekemoer, STScI
+	Author: Anton M. Koekemoer, STScI
+
+	v1.1	2022-01-31	Added input args and env variables, tidied some up.
+
+	v1.2	2022-01-31	Fixed some bugs so that it should at least ru for analysis_type='absolute'
+
 
 
 Overview:
@@ -11,15 +16,6 @@ Overview:
 
  - Running the script:
  
-	- Environment variables needed:
-
-		MIRAGE_DATA
-		PYSYN_CDBS
-		WEBBPSF_PATH
-		CRDS_CONTEXT
-		CRDS_PATH
-		CRDS_SERVER_URL
-
 	- Shell:
 
 		bash (mostly for consistency with conda install of JWST pipeline and MIRAGE)
@@ -33,21 +29,26 @@ which will have these inputs (currently these are just hardwirsed):
 
 	- Input args:
 
-		xml_file	(eg 'nrc24-1073_same_PA_141deg31.xml')
+		-x	--xmlfile',        Input xml file from APT	(default='nrc24-1073_same_PA_141deg31.xml')
+		-p	--pointing',       Input pointing file from APT	(default='nrc24-1073_same_PA_141deg31.pointing') 
+		-a	--analysis_type',  Type of analysis		(default="absolute", other allowed choice is "relative")
+		-r	--refcat',         Reference astrometric cat	(default='lmc_catalog_flag1.cat')
 
-		pointing_file	(eg 'nrc24-1073_same_PA_141deg31.pointing')
 
-		analysis_type	(either 'absolute', which needs external ref catalog, or 'relative', w.r.t. first exposure)
-
-	- Additional environment variables:
-
-		catfile_lmc		(eg 'lmc_catalog_flag1.cat')
+	- Additional environment variables (optional, default to './' if not provided)
 
 		analysis_dir		(eg 'nrc24_analysis/')
 
 		pipeline_outputs_stage2 (eg 'pipeline_outputs_stage2/')
 
-	And whatever other inputs / env variables are useful.
+	- Note that it will currently just look for all *_cal.fits files in path "pipeline_outputs_stage2"
+
+	- Also, the default "Analysis_Type" is :absolute", for which it needs this catalog:
+
+		lmc_catalog_flag1.cat
+
+		(which is available from our NRC24 page  https://outerspace.stsci.edu/display/JN/CAP%3A+NIRCam-24
+
 
 
 Script execution:
@@ -60,6 +61,8 @@ Script execution:
 	  (currently the (0,0) dither file needs to be hardcoded, since not all the dither patterns include a (0,0) dither)
 
 	- for each combination of propid / observation / filter:
+
+		- loop through all the exposures, and all the SCA files for each exposure
 
 		- match the RA,Dec of all detected sources to those in the reference catalog
 
