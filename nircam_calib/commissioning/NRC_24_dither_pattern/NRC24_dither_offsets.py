@@ -7,13 +7,22 @@
 #	Author: Anton M. Koekemoer, STScI
 #
 #	#################################
+#
+#	v1.1	2022-01-31	Added input args and env variables, tidied some up.
+#
+# Usage:
+#	If run without input args, as:
+#
+#		python NRC24_dither_offsets.py
+#
+#	then it will read all *_cal.fits files from path "pipeline_outputs_stage2"
+#	and place all output files, plots etc in path "analysis_dir"
 
 
 
 
-
+import os, glob, sys, argparse
 from glob import glob
-import os, sys
 import shutil
 import urllib
 
@@ -297,49 +306,40 @@ def plot_title(prop_obsid_filter):
 if __name__ == '__main__':
 #=========================
 
-  dither_positions_dict = \
-       {'3TIGHT':     3,
-        '2TIGHTGAPS': 2,
-        '3TIGHTGAPS': 3,
-        '4TIGHT':     4,
-        '5TIGHT':     5,
-        '6TIGHT':     6,
-        '8NIRSPEC':   8}
-
-  out_dir       = './'
-
-  xml_file      = 'nrc24-1073_same_PA_141deg31.xml'
-  pointing_file = 'nrc24-1073_same_PA_141deg31.pointing'
-
-  yaml_dir                         = 'yaml_files/'
-  simdata_dir                      = 'simulated_data/'
-
-  pipeline_outputs_stage1          = 'pipeline_outputs_stage1/'
-  pipeline_outputs_stage2          = 'pipeline_outputs_stage2/'
-  pipeline_outputs_stage3          = 'pipeline_outputs_stage3_with_tweakreg_and_mosaics_unrot/'
-  pipeline_outputs_stage3_asnfiles = 'pipeline_outputs_stage3_with_tweakreg_and_mosaics_unrot_asnfiles/'
-
-  analysis_dir                     = 'nrc24_analysis/'
-
-
-  if (not os.path.exists(analysis_dir)):  os.mkdir(analysis_dir)
-
-
-
-  # Determine what type of analysis is being done:
-  # ==============================================
+  # There are two choices for the type of analysis to be done:
   #
   #	'absolute'	- aligns all exposures to external catalog, currently LMC
   #			- best for displaying the actual dither offsets (eg for patterns that have no (0,0) dither)
+  #			- this is the option most redcently tested
   #
   #	'relative'	- aligns all exposures to the first one
   #			- best for cases where an external catalog might not be available (eg other areas of the sky)
   #			- limited in that all dithers are relative to first exposure, ie won't match dithers for patterns that have bo (0,0) dither
-  #
-  analysis_type = 'absolute'
-  #
-  #analysis_type = 'relative'
+  #			- this was implemented earlier but hasn't been fully tested in a while.
 
+
+  parser = argparse.ArgumentParser(description='Run NRC24_dither_offsets script.')
+  parser.add_argument('-x',  '--xmlfile',        default='nrc24-1073_same_PA_141deg31.xml',      type=str, help='Input xml file from APT.')
+  parser.add_argument('-p',  '--pointing',       default='nrc24-1073_same_PA_141deg31.pointing', type=str, help='Input pointing file from APT.') 
+  parser.add_argument('-a',  '--analysis_type',  default='absolute', type=str, help='Type of analysis, either "absolute" or "relative.')
+  parser.add_argument('-r',  '--refcat',         default='lmc_catalog_flag1.cat', type=str, help='Reference astrometric catalog.')
+
+  options = parser.parse_args()
+
+  xml_file       = options.xmlfile
+  pointing_file  = options.pointing
+  analysis_type  = options.analysis_type
+  catfile_lmc    = options.refcat
+
+  # Environment variables needed
+  #
+  pipeline_outputs_stage2 = os.getenv('pipeline_outputs_stage2')
+  analysis_dir            = os.getenv('analysis_dir')
+  #
+  if (pipeline_outputs_stage2 == None):  pipeline_outputs_stage2 = './'
+  if (analysis_dir == None):  analysis_dir = './'
+
+  if (not os.path.exists(analysis_dir)):  os.mkdir(analysis_dir)
 
 
 
@@ -347,7 +347,10 @@ if __name__ == '__main__':
   # Read in the LMC catalog
   # -----------------------
   #
-  catfile_lmc = 'lmc_catalog_flag1.cat'
+  if (analysis_type == 'absolute') and (not os.path.exists(catfile_lmc))):
+    #
+    print('For analysis_type="absolute", need to have a catalog! Did not find catalog file: ',catfile_lmc)
+    sys.exit()
   #
   catalog_lmc = Table.read(catfile_lmc, format='ascii')
   #
@@ -369,12 +372,8 @@ if __name__ == '__main__':
     #filename_dither_x0y0 = 'jw01073004001_01101_00001_nrca5_cal.fits'	# for LW
     filename_dither_x0y0 = 'jw01073004001_01101_00001_nrca1_cal.fits'	# for SW
     #
-    if (not os.path.exists(analysis_dir+filename_dither_x0y0)):
-      #
-      a = os.system('/bin/cp -p '+pipeline_outputs_stage2+filename_dither_x0y0+' '+analysis_dir)
-    #
-    hdr0 = fits.getheader(analysis_dir+filename_dither_x0y0, 0)
-    hdr  = fits.getheader(analysis_dir+filename_dither_x0y0, 1)
+    hdr0 = fits.getheader(pipeline_outputs_stage2+filename_dither_x0y0, 0)
+    hdr  = fits.getheader(pipeline_outputs_stage2+filename_dither_x0y0, 1)
     #
     instrument      = hdr0['INSTRUME']
     apername        = hdr0['APERNAME']
@@ -766,10 +765,6 @@ if __name__ == '__main__':
                 #
                 rootnames.append(rootname)
                 #
-                if (not os.path.exists(analysis_dir+filename)):
-                  print('/bin/cp -p '+filename_full+'  '+analysis_dir)
-                  a = os.system('/bin/cp -p '+filename_full+'  '+analysis_dir)
-                #
                 catfile_daofind = rootname + '_daofind_cat.csv'
                 #
                 if (not os.path.exists(analysis_dir+catfile_daofind)):
@@ -796,9 +791,8 @@ if __name__ == '__main__':
               #
               for rootname in rootnames:
                 #
-                filename_full     = analysis_dir + rootname + '.fits'
-                catfile_pipeline3 = analysis_dir + rootname + '_cat.ecsv'
-                catfile_daofind   = analysis_dir + rootname + '_daofind_cat.csv'
+                filename_full     = pipeline_outputs_stage2 + rootname + '.fits'
+                catfile_daofind   = analysis_dir            + rootname + '_daofind_cat.csv'
                 #
                 print('\nrootname = ',rootname)
                 #
@@ -1166,8 +1160,3 @@ if __name__ == '__main__':
 
 
 
-
-
-
-
- 
