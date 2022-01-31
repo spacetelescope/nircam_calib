@@ -10,13 +10,26 @@
 #
 #	v1.1	2022-01-31	Added input args and env variables, tidied some up.
 #
+#	v1.2	2022-01-31	Fixed some bugs so that it should at least ru for analysis_type='absolute'
+#
+#
 # Usage:
 #	If run without input args, as:
 #
 #		python NRC24_dither_offsets.py
 #
-#	then it will read all *_cal.fits files from path "pipeline_outputs_stage2"
-#	and place all output files, plots etc in path "analysis_dir"
+#	then it will:
+#
+#		- read all input *_cal.fits files from path "pipeline_outputs_stage2"
+#
+#		- place all output files, plots etc in path "analysis_dir"
+#
+#	Note that the default "Analysis_Type" is :absolute", for which it needs this catalog:
+#
+#		lmc_catalog_flag1.cat
+#
+#		(which is available from our NRC24 page  https://outerspace.stsci.edu/display/JN/CAP%3A+NIRCam-24
+
 
 
 
@@ -347,7 +360,7 @@ if __name__ == '__main__':
   # Read in the LMC catalog
   # -----------------------
   #
-  if (analysis_type == 'absolute') and (not os.path.exists(catfile_lmc))):
+  if (analysis_type == 'absolute') and (not os.path.exists(catfile_lmc)):
     #
     print('For analysis_type="absolute", need to have a catalog! Did not find catalog file: ',catfile_lmc)
     sys.exit()
@@ -738,9 +751,6 @@ if __name__ == '__main__':
             #
             dither_xoffset = hdr0['XOFFSET']
             dither_yoffset = hdr0['YOFFSET']
-            #
-            dither_offsets_dict[prop_obsid_filter_expnum]['commanded_xdither'] = dither_xoffset
-            dither_offsets_dict[prop_obsid_filter_expnum]['commanded_ydither'] = dither_yoffset
             #
             if (os.path.exists(catfile_current_exposure)):
               #
