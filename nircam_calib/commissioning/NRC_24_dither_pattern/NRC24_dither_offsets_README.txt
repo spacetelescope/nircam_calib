@@ -6,7 +6,9 @@ Readme file for:
 
 	v1.1	2022-01-31	Added input args and env variables, tidied some up.
 
-	v1.2	2022-01-31	Fixed some bugs so that it should at least ru for analysis_type='absolute'
+	v1.2	2022-01-31	Fixed some bugs so that it should at least run for analysis_type='absolute'
+
+	v1.3	2022-02-01	Added back the PSF fitting (adapted from Kevin's script), also an input for selecting a subset of cal.fits files
 
 
 
@@ -29,10 +31,10 @@ which will have these inputs (currently these are just hardwirsed):
 
 	- Input args:
 
-		-x	--xmlfile',        Input xml file from APT	(default='nrc24-1073_same_PA_141deg31.xml')
-		-p	--pointing',       Input pointing file from APT	(default='nrc24-1073_same_PA_141deg31.pointing') 
-		-a	--analysis_type',  Type of analysis		(default="absolute", other allowed choice is "relative")
-		-r	--refcat',         Reference astrometric cat	(default='lmc_catalog_flag1.cat')
+		-a	--analysis_type		Type of analysis		(default="absolute", other allowed choice is "relative")
+		-r	--refcat		Reference astrometric cat	(default='lmc_catalog_flag1.cat')
+		-i	--inputfiles		Input cal.fits files, passed to glob		(default="*")
+		-c	--catalog_type		Catalog type to use, currently either "dao" or "psf" (default="psf")
 
 
 	- Additional environment variables (optional, default to './' if not provided)
@@ -47,7 +49,7 @@ which will have these inputs (currently these are just hardwirsed):
 
 		lmc_catalog_flag1.cat
 
-		(which is available from our NRC24 page  https://outerspace.stsci.edu/display/JN/CAP%3A+NIRCam-24
+		(which is available from our NRC24 page  https://outerspace.stsci.edu/display/JN/CAP%3A+NIRCam-24)
 
 
 
