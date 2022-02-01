@@ -10,7 +10,9 @@
 #
 #	v1.1	2022-01-31	Added input args and env variables, tidied some up.
 #
-#	v1.2	2022-01-31	Fixed some bugs so that it should at least ru for analysis_type='absolute'
+#	v1.2	2022-01-31	Fixed some bugs so that it should at least run for analysis_type='absolute'
+#
+#	v1.3	2022-02-01	Added back the PSF fitting (adapted from Kevin's script), also an input for selecting a subset of cal.fits files
 #
 #
 # Usage:
@@ -24,11 +26,11 @@
 #
 #		- place all output files, plots etc in path "analysis_dir"
 #
-#	Note that the default "Analysis_Type" is :absolute", for which it needs this catalog:
+#	Note that the default "analysis_type" is "absolute", for which it needs this catalog:
 #
 #		lmc_catalog_flag1.cat
 #
-#		(which is available from our NRC24 page  https://outerspace.stsci.edu/display/JN/CAP%3A+NIRCam-24
+#		(which is available from our NRC24 page  https://outerspace.stsci.edu/display/JN/CAP%3A+NIRCam-24)
 
 
 
@@ -38,6 +40,7 @@ import os, glob, sys, argparse
 from glob import glob
 import shutil
 import urllib
+from datetime import datetime
 
 
 # Imports for pysiaf, astropy, matplotlib, math, etc.
@@ -57,6 +60,8 @@ import numpy as np
 from astropy.stats import gaussian_sigma_to_fwhm
 from astropy.stats import sigma_clipped_stats
 from astropy.table import Table
+
+from astropy.visualization import imshow_norm, PercentileInterval, SqrtStretch
 
 from photutils import BasicPSFPhotometry
 from photutils import DBSCANGroup, MMMBackground
@@ -118,6 +123,10 @@ from jwst.source_catalog import SourceCatalogStep
 from jwst import datamodels
 from jwst.associations import asn_from_list
 from jwst.associations.lib.rules_level3_base import DMS_Level3_Base
+
+# webbpsf
+import webbpsf
+from webbpsf.gridded_library import display_psf_grid
 
 # Needed for multiprocessing
 import multiprocessing
@@ -283,6 +292,142 @@ def setup_dither_pattern(prop_obsid):
 
 
 
+#====================================================
+def convert_sci_to_sky(xsci, ysci, pheader, fheader):
+#====================================================
+
+    """
+    Convert science pixel coordinates to RA/Dec
+
+    Uses header info from an input file to generate siaf aperture object,
+    and uses the pointing information to then create attitude matrix,
+    which combines with pysiaf distortion information to convert from 
+    'sci' pixel coordinates to 'sky' coorinates.
+    
+    Parameters
+    ==========
+    xsci : float or ndarray
+        pixel positions along x-axis ('sci' orientation of image)
+    ysci : float or ndarray
+        pixel positions along y-axis ('sci' orientation of image)
+    file : string
+        Location of DMS file containing necessary header info
+
+    Returns
+    =======
+    RA and Dec arrays.
+    """
+
+    #hdul = fits.open(file)
+    #pheader = hdul[0].header
+    #fheader = hdul[1].header
+    #hdul.close
+
+    # Get SIAF info
+    siaf = pysiaf.Siaf('NIRCam')
+    apername = pheader.get('APERNAME')
+    apsiaf = siaf[apername]
+
+    # V3 PA
+    pa_v3 = fheader.get('V3I_YANG')
+    # RA/Dec located at aperture reference position
+    ra_ref = fheader.get('RA_REF')
+    dec_ref = fheader.get('DEC_REF')
+    # V2/V3 aperture reference
+    v2_ref, v3_ref = apsiaf.reference_point('tel')
+
+    # Create attitude matrix
+    att = pysiaf.utils.rotations.attitude(v2_ref, v3_ref, ra_ref, dec_ref, pa_v3)
+    apsiaf.set_attitude_matrix(att)
+
+    # Conver to sky coordinates
+    ra_deg, dec_deg = apsiaf.convert(xsci, ysci, 'sci', 'sky')
+
+    return (ra_deg, dec_deg)
+
+
+
+
+
+
+
+
+#===============================================================================================
+def psf_fit(data_array, pheader, fheader, data_file, psf_grid, catfile_daofind, catfile_psffit):
+#===============================================================================================
+# Adapted from Kevin Hainline's script.
+# This is the function that actually runs the PSF fitting on the data files from the same SCA
+
+    sources = Table.read(catfile_daofind)
+    
+    #flux_min = 5
+    #flux_max = 50
+    # for now, just use all the sources
+    flux_min = -1.e10
+    flux_max = 1.e10
+    flux_range = np.where((sources['flux'] > flux_min) & (sources['flux'] < flux_max))[0]
+    
+    init_tbl = Table()
+    init_tbl['x_0'] = sources['xcentroid'][flux_range]
+    init_tbl['y_0'] =  sources['ycentroid'][flux_range]
+    init_tbl['flux_0'] =  sources['flux'][flux_range]
+
+    plt.figure(figsize=(9, 9))
+    imshow_norm(data_array, interval=PercentileInterval(99.), stretch=SqrtStretch())
+    plt.scatter(init_tbl['x_0'], init_tbl['y_0'], s=10, color = 'black')
+    plt.savefig(catfile_psffit[:-8]+'_plot_with_daostarfinder_objects.png', dpi=300)
+
+    eval_xshape = int(np.ceil(psf_grid.data.shape[2] / psf_grid.oversampling))
+    eval_yshape = int(np.ceil(psf_grid.data.shape[1] / psf_grid.oversampling))
+
+    sigma_psf = 3.
+    daogroup = DBSCANGroup(2.0 * sigma_psf * gaussian_sigma_to_fwhm)
+    mmm_bkg = MMMBackground()
+    fit_shape = (eval_yshape, eval_xshape)
+    phot = BasicPSFPhotometry(daogroup, mmm_bkg, psf_grid, fit_shape, finder=None, aperture_radius=3.)
+    
+    #now = datetime.now()
+    #dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+    #print("Starting the fit: date and time = ", dt_string)
+    
+    tbl = phot(data_array, init_guesses=init_tbl)
+    
+    #now = datetime.now()
+    #dt_string = now.strftime("%d/%m/%Y %H:%M:%S")
+    #print("Ending the fit: date and time = ", dt_string)
+    
+    # the following loses too much precision, just keep all the decimal places
+    #tbl['x_fit'].format = '%.1f'
+    #tbl['y_fit'].format = '%.1f'
+    #tbl['flux_fit'].format = '%.4e'
+    #tbl['flux_unc'].format = '%.4e'
+    #tbl['x_0_unc'].format = '%.4e'
+    #tbl['y_0_unc'].format = '%.4e'
+    
+    diff = phot.get_residual_image()
+    
+    plt.figure(figsize=(9, 9))
+    imshow_norm(diff, interval=PercentileInterval(99.), stretch=SqrtStretch())
+    #plt.scatter(tbl['x_fit'], tbl['y_fit'], s=80, facecolors='none', edgecolors='r')
+    plt.colorbar()
+    plt.savefig(catfile_psffit[:-8]+'_plot_residual.png', dpi=300)
+    
+    RA_fit = np.zeros(len(tbl['x_fit']))
+    DEC_fit = np.zeros(len(tbl['x_fit']))
+    for star in range(len(tbl['x_fit'])):
+        RA_fit[star], DEC_fit[star] = convert_sci_to_sky(tbl['x_fit'][star], tbl['y_fit'][star], pheader, fheader)
+    
+    tbl.add_column(DEC_fit, index=0, name='DEC_fit')
+    tbl.add_column(RA_fit, index=0, name='RA_fit')
+    
+    # And write out the table to a file. 
+    tbl.write(catfile_psffit)
+
+
+
+
+
+
 
 
 
@@ -315,6 +460,8 @@ def plot_title(prop_obsid_filter):
 
 
 
+
+
 #=========================
 if __name__ == '__main__':
 #=========================
@@ -332,17 +479,18 @@ if __name__ == '__main__':
 
 
   parser = argparse.ArgumentParser(description='Run NRC24_dither_offsets script.')
-  parser.add_argument('-x',  '--xmlfile',        default='nrc24-1073_same_PA_141deg31.xml',      type=str, help='Input xml file from APT.')
-  parser.add_argument('-p',  '--pointing',       default='nrc24-1073_same_PA_141deg31.pointing', type=str, help='Input pointing file from APT.') 
   parser.add_argument('-a',  '--analysis_type',  default='absolute', type=str, help='Type of analysis, either "absolute" or "relative.')
   parser.add_argument('-r',  '--refcat',         default='lmc_catalog_flag1.cat', type=str, help='Reference astrometric catalog.')
+  parser.add_argument('-i',  '--inputfiles',     default='*', type=str, help='Input cal.fits files, passed to glob')
+  parser.add_argument('-c',  '--catalog_type',   default='psf', type=str, help='Catalog type to use, currently either "dao" or "psf"')
 
   options = parser.parse_args()
 
-  xml_file       = options.xmlfile
-  pointing_file  = options.pointing
-  analysis_type  = options.analysis_type
-  catfile_lmc    = options.refcat
+  analysis_type = options.analysis_type
+  catfile_lmc   = options.refcat
+  inputfiles    = options.inputfiles
+  catalog_type  = options.catalog_type
+
 
   # Environment variables needed
   #
@@ -507,7 +655,7 @@ if __name__ == '__main__':
   # 	- each entry will be a list of "proposal_obsid_filter"
   #	- each "proposal_obsid_filter" will be a list of "proposal_obsid_filter_expnum"
   #
-  filenames = sorted(glob(pipeline_outputs_stage2+'*_cal.fits'))
+  filenames = sorted(glob(pipeline_outputs_stage2+inputfiles+'*_cal.fits'))
   #
   filename_dict = {}
   #
@@ -548,8 +696,51 @@ if __name__ == '__main__':
 
 
 
+  # Set up a dictionary of PSF nrc_grids for all the different SCA+filter combinations
+  # ==================================================================================
+  #
+  nrc_grid_dict = {}
+  #
+  # Also set up some relevant parameters for PSF fitting
+  #
+  num_psfs   = 9	# 3x3 grid
+  fov_pixels = 33
+  oversample = 2
+  #
+  # This part actually is done later on in the code; comment it out here and just take care of it further down
+  #
+  """
+  for filename_full in filenames:
+    #
+    hdu = fits.open(filename_full)
+    #
+    filtername = hdu[0].header['FILTER']
+    detector   = hdu[0].header['DETECTOR']
+    #
+    hdu.close()
+    #
+    if (detector == 'NRCALONG'):  detector = 'NRCA5'
+    if (detector == 'NRCBLONG'):  detector = 'NRCB5'
+    #
+    nrc = webbpsf.NIRCam()
+    nrc.filter   = filtername
+    nrc.detector = detector
+    #
+    detector_filter = '_'.join([detector, filtername])
+    #
+    if (not detector_filter in nrc_grid_dict.keys()):
+      print(detector_filter)
+      nrc_grid  = nrc.psf_grid(num_psfs=num_psfs, all_detectors=False, fov_pixels=fov_pixels, oversample=oversample)
+      nrc_grid_dict[detector_filter] = nrc_grid
+  """
+
+
+
 
   # tolerance for matching detected sources to reference catalog
+  #
+  # Might end up passing as an input param if it becomes really necessary.
+  #
   #
   tol = 0.10 / 3600.	# Set maximum tolerance for matching detected sources to the existing astrometric catalog
 
@@ -668,7 +859,8 @@ if __name__ == '__main__':
       #
       catfile_all_matched = analysis_dir + prop_obsid_filter + '_all_matched_cat.csv'
       #
-      if (os.path.exists(catfile_all_matched)):
+      if (False):
+#      if (os.path.exists(catfile_all_matched)):
         #
         catalog_all_matched = Table.read(catfile_all_matched)
         #
@@ -752,7 +944,8 @@ if __name__ == '__main__':
             dither_xoffset = hdr0['XOFFSET']
             dither_yoffset = hdr0['YOFFSET']
             #
-            if (os.path.exists(catfile_current_exposure)):
+            if (False):
+#            if (os.path.exists(catfile_current_exposure)):
               #
               catalog_current_exposure= Table.read(catfile_current_exposure)
               #
@@ -775,9 +968,11 @@ if __name__ == '__main__':
                 #
                 rootnames.append(rootname)
                 #
-                catfile_daofind = rootname + '_daofind_cat.csv'
+                catfile_daofind = analysis_dir + rootname + '_daofind_cat.csv'
                 #
-                if (not os.path.exists(analysis_dir+catfile_daofind)):
+                catfile_psffit  = analysis_dir + rootname + '_psffit_cat.csv'
+                #
+                if (not os.path.exists(catfile_daofind)):
                   #
                   print('Creating DAOfind catalog:  ',catfile_daofind)
                   #
@@ -793,7 +988,45 @@ if __name__ == '__main__':
                   mean, med, rms = sigma_clipped_stats(img_data, sigma=3.0) 
                   daofind = DAOStarFinder(fwhm=3.0, threshold=1500.*rms)  
                   tbl_sources = daofind.find_stars(img_data - med)
-                  tbl_sources.write(analysis_dir+catfile_daofind, overwrite=True)
+                  tbl_sources.write(catfile_daofind, overwrite=True)
+                #
+                if (catalog_type == 'psf'):
+                  #
+                  if (not os.path.exists(catfile_psffit)):
+                    #
+                    print('Creating PSF-fit catalog:  ',catfile_psffit)
+                    #
+                    hdu = fits.open(filename_full)
+                    #
+                    pheader    = hdu[0].header
+                    fheader    = hdu[1].header
+                    data_array = hdu[1].data
+                    #
+                    filtername = pheader['FILTER']
+                    detector   = pheader['DETECTOR']
+                    #
+                    hdu.close()
+                    #
+                    if (detector == 'NRCALONG'):  detector = 'NRCA5'
+                    if (detector == 'NRCBLONG'):  detector = 'NRCB5'
+                    #
+                    detector_filter = '_'.join([detector, filtername])
+                    #
+                    if (detector_filter in nrc_grid_dict.keys()):
+                      #
+                      nrc_grid = nrc_grid_dict[detector_filter]
+                      #
+                    else:
+                      #
+                      nrc = webbpsf.NIRCam()
+                      nrc.filter   = filtername
+                      nrc.detector = detector
+                      #
+                      nrc_grid  = nrc.psf_grid(num_psfs=num_psfs, all_detectors=False, fov_pixels=fov_pixels, oversample=oversample)
+                      nrc_grid_dict[detector_filter] = nrc_grid
+                  #
+                  psf_fit(data_array, pheader, fheader, filename_full, nrc_grid, catfile_daofind, catfile_psffit)
+              #
               #
               #
               # Loop through all the SCA files for this exposure and create the necessary catalogs
@@ -809,11 +1042,21 @@ if __name__ == '__main__':
                 # Read in the x, y pixel coords for this SCA
                 # ------------------------------------------
                 #
-                if (os.path.exists(catfile_daofind)):
+                if (catalog_type == 'psf'):
                   #
-                  sources_tbl = Table.read(catfile_daofind)
-                  x_pix_catfile = sources_tbl['xcentroid']  +  1.0
-                  y_pix_catfile = sources_tbl['ycentroid']  +  1.0
+                  if (os.path.exists(catfile_psffit)):
+                    #
+                    sources_tbl = Table.read(catfile_psffit)
+                    x_pix_catfile = sources_tbl['x_fit']  +  1.0
+                    y_pix_catfile = sources_tbl['y_fit']  +  1.0
+                  #
+                else:	# in this case just use the daofind catalog
+                  #
+                  if (os.path.exists(catfile_daofind)):
+                    #
+                    sources_tbl = Table.read(catfile_daofind)
+                    x_pix_catfile = sources_tbl['xcentroid']  +  1.0
+                    y_pix_catfile = sources_tbl['ycentroid']  +  1.0
                 #
                 nsources = len(x_pix_catfile)
                 print('nsources detected = ',nsources)
@@ -1051,7 +1294,11 @@ if __name__ == '__main__':
       # Plot all panels on the same page.
       # ---------------------------------
       #
-      plotfile = analysis_dir+'plot_'+prop_obsid_filter+'.'+plottype
+      if (catalog_type == 'psf'):
+        plotfile = analysis_dir+'plot_psffit_'+prop_obsid_filter+'.'+plottype
+      else:
+        plotfile = analysis_dir+'plot_daofind_'+prop_obsid_filter+'.'+plottype
+
 
       mpl.rcParams.update({
                 'font.family': 'sans-serif',
