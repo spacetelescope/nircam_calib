@@ -13,6 +13,7 @@
 #	v1.2	2022-01-31	Fixed some bugs so that it should at least run for analysis_type='absolute'
 #
 #	v1.3	2022-02-01	Added back the PSF fitting (adapted from Kevin's script), also an input for selecting a subset of cal.fits files
+#	v1.3.1	2022-02-01	Removed a couple of statements that were accidentally left in from testing
 #
 #
 # Usage:
@@ -859,8 +860,8 @@ if __name__ == '__main__':
       #
       catfile_all_matched = analysis_dir + prop_obsid_filter + '_all_matched_cat.csv'
       #
-      if (False):
-#      if (os.path.exists(catfile_all_matched)):
+      #if (False):
+      if (os.path.exists(catfile_all_matched)):
         #
         catalog_all_matched = Table.read(catfile_all_matched)
         #
@@ -944,8 +945,8 @@ if __name__ == '__main__':
             dither_xoffset = hdr0['XOFFSET']
             dither_yoffset = hdr0['YOFFSET']
             #
-            if (False):
-#            if (os.path.exists(catfile_current_exposure)):
+            #if (False):
+            if (os.path.exists(catfile_current_exposure)):
               #
               catalog_current_exposure= Table.read(catfile_current_exposure)
               #
