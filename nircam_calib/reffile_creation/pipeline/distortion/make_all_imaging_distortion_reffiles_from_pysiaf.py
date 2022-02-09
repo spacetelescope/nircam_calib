@@ -10,7 +10,10 @@ import os
 basedir = '/Users/hilbert/python_repos/distortion_reffile_creation_from_johannes_code/fix_for_vera'
 
 # To use a version of the SIAF other than the default in pysiaf, enter the
-# name of a SIAF xml file here.
+# name of a SIAF xml file here. Otherwise set this to None. The use of a distortion coefficient file
+# input in combination with a SIAF file input means that the distortion coefficients will be taken
+# from the distortion coefficient file, while other values, such as V3YSciAng, will be taken from
+# the SIAF file. These latter values will be taken from pysiaf if no SIAF file is provided.
 #siaf_xml_file = None
 siaf_xml_file = '~/Documents/PRD/PRDOPSSOC-041/SIAFXML/SIAFXML/NIRCam_SIAF.xml'
 if siaf_xml_file[0] == '~':
