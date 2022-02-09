@@ -1,14 +1,23 @@
 """This script creates distortion reference files for NIRCam using the coefficients from
 pysiaf.
 """
+from glob import glob
 import nircam_distortion_reffiles_from_pysiaf as ref
 import numpy as np
 import os
 
+# This is where the distortion reference files will be saved
+basedir = '/Users/hilbert/python_repos/distortion_reffile_creation_from_johannes_code/fix_for_vera'
+
 # To use a version of the SIAF other than the default in pysiaf, enter the
 # name of a SIAF xml file here.
 #siaf_xml_file = None
-siaf_xml_file = '/Users/hilbert/Documents/PRD/PRDOPSSOC-041/SIAFXML/SIAFXML/NIRCam_SIAF.xml'
+siaf_xml_file = '~/Documents/PRD/PRDOPSSOC-041/SIAFXML/SIAFXML/NIRCam_SIAF.xml'
+if siaf_xml_file[0] == '~':
+    siaf_xml_file = os.path.expanduser(siaf_xml_file)
+
+dist_coeff_files = sorted(glob('distortion_coeffs*cal.txt'))
+
 
 nrc_a_apertures = ['NRCA{}_FULL'.format(i+1) for i in range(5)]
 nrc_b_apertures = ['NRCB{}_FULL'.format(i+1) for i in range(5)]
@@ -29,9 +38,9 @@ hist = ("XXXXTEST TESTXXXXThis reference file was created from the distortion co
         "and <detector>_FULL_WEDGE_BAR parent apertures for coronagraphic observations. All "
         "distortion coefficients are calculated from ground based data.")
 
+descrip = "Test files made using coefficients from Tony Sohn's script"
 
-#basedir = '/grp/jwst/wit/nircam/reference_files/distortion/coron_distortion_files_2021_Sept'
-basedir = '/Users/hilbert/python_repos/distortion_reffile_creation_from_johannes_code'
+
 # IMAGING metadata-----------------------------------------------
 sw_imaging_pupil = ['CLEAR', 'F162M', 'F164N', 'GDHS0', 'GDHS60', 'WLM8', 'WLP8', 'PINHOLES', 'MASKIPR', 'FLAT']
 lw_imaging_pupil = ['CLEAR', 'F323N', 'F405N', 'F466N', 'F470N', 'PINHOLES', 'MASKIPR', 'GRISMR', 'GRISMC', 'FLAT']
@@ -44,9 +53,19 @@ sw_exptype = ['NRC_IMAGE', 'NRC_TSIMAGE', 'NRC_FLAT', 'NRC_LED',
               'NRC_DARK', 'NRC_WFSS', 'NRC_TSGRISM', 'NRC_GRISM']
 lw_exptype = sw_exptype #+ ['NRC_WFSS', 'NRC_TSGRISM', 'NRC_GRISM']
 
-for aperture in ['NRCB4_FULL']: #nrc_apertures:
+for aperture in nrc_apertures:
     detector, apname = aperture.split('_')
     outname = os.path.join(basedir, '{}_distortion.asdf'.format(aperture))
+
+    # Select the appropriate coefficient file based on the detector name being in
+    # the coefficient filename
+    coeff_file = [filename for filename in dist_coeff_files if detector.lower() in filename]
+    if len(coeff_file) > 1:
+        raise ValueError(f"More than one input coefficient file has a name containing {detector.lower()}")
+    elif len(coeff_file) == 0:
+        raise ValueError(f"None of the input coefficient files has {detector.lower()} in the name. Unable to continue")
+    else:
+        dist_coeffs_file = coeff_file[0]
 
     if int(detector[-1]) < 5:
         pupil = sw_imaging_pupil
@@ -62,7 +81,7 @@ for aperture in ['NRCB4_FULL']: #nrc_apertures:
 
     ref.create_nircam_distortion(detector, apname, outname, pupil, subarr, exp_type, hist, author='Hilbert',
                                  descrip=descrip, pedigree='GROUND', useafter='2014-10-01T00:00:01',
-                                 dist_coeffs_file='distortion_coeffs_nrcb4_full_f200w_clear_jw01144001001_01101_00001_nrcb4_cal.txt')
+                                 dist_coeffs_file=dist_coeffs_file, siaf_xml_file=siaf_xml_file)
 stop
 
 # CORONAGRAPHY metadata------------------------------------------
