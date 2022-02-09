@@ -39,7 +39,7 @@ import pysiaf
 def create_nircam_distortion(detector, aperture, outname, sci_pupil,
                              sci_subarr, sci_exptype, history_entry,
                              author=None, descrip=None, pedigree=None,
-                             useafter=None, dist_coeffs_file=None):
+                             useafter=None, dist_coeffs_file=None,
                              siaf_xml_file=None):
     """
     Create an asdf reference file with all distortion components for the NIRCam imager.
