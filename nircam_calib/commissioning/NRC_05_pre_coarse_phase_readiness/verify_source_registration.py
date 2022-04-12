@@ -85,7 +85,8 @@ if __name__ == '__main__':
 
     individual_files = []
     with open(args.listfile) as fobj:
-        individual_files.append(fobj.read().strip('\n'))
+        for line in fobj.readlines():
+            individual_files.append(line.strip('\n'))
 
     print(individual_files)
 

@@ -7,7 +7,11 @@ import numpy as np
 import os
 
 # This is where the distortion reference files will be saved
-basedir = '/Users/hilbert/python_repos/distortion_reffile_creation_from_johannes_code/fix_for_vera'
+#basedir = '/Users/hilbert/python_repos/distortion_reffile_creation_from_johannes_code/fix_for_vera'
+basedir = '/grp/jwst/wit/nircam/reference_files/distortion/imaging_distortion_files_post_ote10_update'
+
+useafter = '2021-12-25T00:00:00'
+pedigree = 'INFLIGHT 2022-02-23 2022-03-14'
 
 # To use a version of the SIAF other than the default in pysiaf, enter the
 # name of a SIAF xml file here. Otherwise set this to None. The use of a distortion coefficient file
@@ -15,33 +19,38 @@ basedir = '/Users/hilbert/python_repos/distortion_reffile_creation_from_johannes
 # from the distortion coefficient file, while other values, such as V3YSciAng, will be taken from
 # the SIAF file. These latter values will be taken from pysiaf if no SIAF file is provided.
 #siaf_xml_file = None
-siaf_xml_file = '~/Documents/PRD/PRDOPSSOC-041/SIAFXML/SIAFXML/NIRCam_SIAF.xml'
+siaf_xml_file = '~/Documents/PRD/PRDOPSSOC-044/SIAFXML/SIAFXML/NIRCam_SIAF.xml'
 if siaf_xml_file[0] == '~':
     siaf_xml_file = os.path.expanduser(siaf_xml_file)
 
-dist_coeff_files = sorted(glob('distortion_coeffs*cal.txt'))
+
+#dist_coeff_files = sorted(glob('distortion_coeffs*cal.txt'))
 
 
 nrc_a_apertures = ['NRCA{}_FULL'.format(i+1) for i in range(5)]
 nrc_b_apertures = ['NRCB{}_FULL'.format(i+1) for i in range(5)]
 nrc_apertures = nrc_a_apertures + nrc_b_apertures
 
-hist = ("XXXXXTEST TESTXXXXXThis reference file was created from the distortion coefficients contained in pysiaf "
-        "(and therefore the PRD) as of 24 Oct 2019. This includes the fix for the round trip (V2,V3 -> x,y -> V2, V3) error "
-        "present in previous versions of the coefficients. This update is described in JIRA issues: "
-        "JWSTSIAF-161, JWSTSIAF-123. pysiaf version 0.6.1 was used to access the appropriate "
-        "distortion coefficients. The translation model converts from units of pixels on the detector to "
-        "V2,V3 in units of arcseconds, as well as the inverse.")
+#hist = ("XXXXXTEST TESTXXXXXThis reference file was created from the distortion coefficients contained in pysiaf "
+#        "(and therefore the PRD) as of 24 Oct 2019. This includes the fix for the round trip (V2,V3 -> x,y -> V2, V3) error "
+#        "present in previous versions of the coefficients. This update is described in JIRA issues: "
+#        "JWSTSIAF-161, JWSTSIAF-123. pysiaf version 0.6.1 was used to access the appropriate "
+#        "distortion coefficients. The translation model converts from units of pixels on the detector to "
+#        "V2,V3 in units of arcseconds, as well as the inverse.")
 
 #basedir = 'reference_files/distortion/24Oct2019_round_trip_error_fixed'
 
-hist = ("XXXXTEST TESTXXXXThis reference file was created from the distortion coefficients contained in pysiaf "
-        "version 0.13.0, which uses "
-        "version 39 of the PRD. This version of the PRD makes use of the new <detector>_FULL_WEDGE_RND"
-        "and <detector>_FULL_WEDGE_BAR parent apertures for coronagraphic observations. All "
-        "distortion coefficients are calculated from ground based data.")
+#hist = ("XXXXTEST TESTXXXXThis reference file was created from the distortion coefficients contained in pysiaf "
+#        "version 0.13.0, which uses "
+#        "version 39 of the PRD. This version of the PRD makes use of the new <detector>_FULL_WEDGE_RND"
+#        "and <detector>_FULL_WEDGE_BAR parent apertures for coronagraphic observations. All "
+#        "distortion coefficients are calculated from ground based data.")
 
-descrip = "Test files made using coefficients from Tony Sohn's script"
+hist = ("These imaging mode distortion files were created from distortion coefficients in PRDOPSSOC-044. This includes small updates "
+        "from the analysis of OTE-10 commissioning data. The largest difference between these coefficients and those in the pre-flight reference "
+        "files is a small shift in the V2, V3 location of the SW module B apertures.")
+
+descrip = "Distortion files using SIAF updates from OTE-10 observations"
 
 
 # IMAGING metadata-----------------------------------------------
@@ -62,13 +71,13 @@ for aperture in nrc_apertures:
 
     # Select the appropriate coefficient file based on the detector name being in
     # the coefficient filename
-    coeff_file = [filename for filename in dist_coeff_files if detector.lower() in filename]
-    if len(coeff_file) > 1:
-        raise ValueError(f"More than one input coefficient file has a name containing {detector.lower()}")
-    elif len(coeff_file) == 0:
-        raise ValueError(f"None of the input coefficient files has {detector.lower()} in the name. Unable to continue")
-    else:
-        dist_coeffs_file = coeff_file[0]
+    #coeff_file = [filename for filename in dist_coeff_files if detector.lower() in filename]
+    #if len(coeff_file) > 1:
+    #    raise ValueError(f"More than one input coefficient file has a name containing {detector.lower()}")
+    #elif len(coeff_file) == 0:
+    #    raise ValueError(f"None of the input coefficient files has {detector.lower()} in the name. Unable to continue")
+    #else:
+    #    dist_coeffs_file = coeff_file[0]
 
     if int(detector[-1]) < 5:
         pupil = sw_imaging_pupil
@@ -83,8 +92,8 @@ for aperture in nrc_apertures:
         exp_type = lw_exptype
 
     ref.create_nircam_distortion(detector, apname, outname, pupil, subarr, exp_type, hist, author='Hilbert',
-                                 descrip=descrip, pedigree='GROUND', useafter='2014-10-01T00:00:01',
-                                 dist_coeffs_file=dist_coeffs_file, siaf_xml_file=siaf_xml_file)
+                                 descrip=descrip, pedigree=pedigree, useafter=useafter,
+                                 siaf_xml_file=siaf_xml_file)#, dist_coeffs_file=dist_coeffs_file)
 stop
 
 # CORONAGRAPHY metadata------------------------------------------
@@ -99,7 +108,7 @@ stop
 # These apertures use a distortion model that is a shift + the imaging mode coefficients. A good approximation,
 # but not exact. These are intended as a first attempt at getting this distortion model correct. We now have a
 # real distortion model that includes the wedge for the A module, so the e.g. NRCA1_FULL_WEDGE_RND apertures
-# should be used instead.
+# should be used instead, as seen below.
 #a2_round_aperture = ['NRCA2_FULL_MASK210R']
 #a4_bar_aperture = ['NRCA4_FULL_MASKSWB']
 #a5_round_aperture = ['NRCA5_FULL_MASK335R']
@@ -117,21 +126,28 @@ stop
 #nrc_coron_apertures = a2_round_aperture + a4_bar_aperture + a5_round_aperture + a5_bar_aperture + b1_round_aperture + b3_bar_aperture + b5_round_aperture + b5_bar_aperture
 
 
-hist = ("This reference file was created using the distortion coefficients in PRD version PRDOPSSOC-041. This "
+hist = ("This reference file was created using the distortion coefficients in PRD version PRDOPSSOC-044. This "
         "version of the PRD contains new FULL_WEDGE_RND and FULL_WEDGE_BAR apertures for all A module detectors. "
         "The distortion model for these new apertures is a complete model. Previously, the distortion model for "
         "these apertures, which was only available for the A2, A4, and A5 detectors, was an approximation created "
         "by shifting the imaging mode coefficients to account for the effects of the wedge. With this delivery, "
-        "all A module detectors will contain the complete distortion model. See CRDS-506 for more information.")
+        "all A module detectors will contain the complete distortion model. See CRDS-506 for more information. "
+        "These files replace the pervious version of the coronagraphic reference files, (jwst_nircam_distortion_0111 "
+        "through 0120) which used an incorrect V2Ref, V3Ref. These files also add NRC_IMAGE to the list of EXP_TYPES. "
+        "This will allow exposures taken using the NIRCam Engineering Imaging template with a coronagraphic Lyot stop "
+        "in the pupil to have the correct distortion applied.")
 
-basedir = 'reference_files/distortion/coron_distortion_files_amod_wedge_apertures_2022_Jan'
+descrip = "Distortion reffiles for obs with the coron optical mount in the beam"
+
+#basedir = 'reference_files/distortion/coron_distortion_files_amod_wedge_apertures_2022_Jan'
+basedir = '/grp/jwst/wit/nircam/reference_files/distortion/coron_distortion_files_amod_wedge_apertures_2022_Mar'
 
 nrc_coron_apertures = ['NRCA1_FULL_WEDGE_RND', 'NRCA2_FULL_WEDGE_RND', 'NRCA3_FULL_WEDGE_RND',
                        'NRCA4_FULL_WEDGE_RND', 'NRCA5_FULL_WEDGE_RND', 'NRCA1_FULL_WEDGE_BAR',
                        'NRCA2_FULL_WEDGE_BAR', 'NRCA3_FULL_WEDGE_BAR', 'NRCA4_FULL_WEDGE_BAR',
                        'NRCA5_FULL_WEDGE_BAR']
 
-coron_exptype = ['NRC_CORON', 'NRC_TACQ', 'NRC_TACONFIRM']
+coron_exptype = ['NRC_CORON', 'NRC_TACQ', 'NRC_TACONFIRM', 'NRC_IMAGE']
 
 for aperture in nrc_coron_apertures:
     parts = aperture.split('_')
@@ -156,4 +172,4 @@ for aperture in nrc_coron_apertures:
     subarr = ['GENERIC']
     exp_type = coron_exptype
 
-    ref.create_nircam_distortion(detector, apname, outname, pupil, subarr, exp_type, hist, siaf_xml_file=siaf_xml_file)
+    ref.create_nircam_distortion(detector, apname, outname, pupil, subarr, exp_type, hist, descrip=descrip, siaf_xml_file=siaf_xml_file)
