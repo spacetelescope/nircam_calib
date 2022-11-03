@@ -40,20 +40,24 @@ from mirage.apt.apt_inputs import AptInput
 
 from nircam_calib.commissioning.utils.photometry import find_sources, fwhm, get_fwhm
 
-extended_subarr_ref_ra = 80.4875
-extended_subarr_ref_dec = -69.4975
+#extended_subarr_ref_ra = 80.4875
+#extended_subarr_ref_dec = -69.4975
 
 # This is the RA, Dec of the J=14 star as input in APT
 # (NOTE THAT THIS IS ACTUALLY NOT CORRECT. IT'S OFF BY 0.13".
 # HOPEFULLY WE WILL CORRECT THE COORDINATES IN THE APT FILE)
-STAR_RA = 80.482577917
-STAR_DEC = -69.493958333
+#STAR_RA = 80.482577917
+#STAR_DEC = -69.493958333
 
 # Real RA and Dec, from the 2MASS catalog
-real_star_ra = 80.482541
-real_star_dec = -69.4939583
-ra_err = 0.08  # arcsec, from 2MASS
-dec_err = 0.06  # arcsec, from 2MASS
+#real_star_ra = 80.482541
+#real_star_dec = -69.4939583
+#ra_err = 0.08  # arcsec, from 2MASS
+#dec_err = 0.06  # arcsec, from 2MASS
+
+# NRC-19 was observed during cold attitude, so we had to change targets:
+STAR_RA = 280.614502916667
+STAR_DEC = -8.401405555555556
 
 
 """
@@ -95,10 +99,11 @@ def check_pointing_target_star(filename, out_dir='./', threshold=50):
     """
     print('Working on: {}...'.format(filename))
     model = datamodels.open(filename)
-    pix_scale = model.meta.wcsinfo.cdelt1
-    if pix_scale is None:
-        pix_scale = model.meta.wcsinfo.cd1_1
-    pix_scale = np.abs(pix_scale) * 3600.
+
+    #pix_scale = model.meta.wcsinfo.cdelt1
+    #if pix_scale is None:
+    #    pix_scale = model.meta.wcsinfo.cd1_1
+    #pix_scale = np.abs(pix_scale) * 3600.
 
     # Calculate the expected location of tbe target based on
     # the SIAF and the dither information
@@ -118,9 +123,9 @@ def check_pointing_target_star(filename, out_dir='./', threshold=50):
         else:
             aperture_name = '{}_GRISMTS256'.format(detector)
 
-
     #aperture_name = '{}_{}'.format(detector, aperture)
     siaf = pysiaf.Siaf('nircam')[aperture_name]
+    pix_scale = siaf.XSciScale
     xoffset = model.meta.dither.x_offset  # Units here are arcsec in ideal coord sys
     yoffset = model.meta.dither.y_offset  # Units here are arcsec in ideal coord sys
     #xscale = siaf.XSciScale
@@ -136,6 +141,8 @@ def check_pointing_target_star(filename, out_dir='./', threshold=50):
     # Calculate the pixel corresponding to the RA, Dec value of the star
     world2det = model.meta.wcs.get_transform('world', 'detector')
     star_x, star_y = world2det(STAR_RA, STAR_DEC)
+
+    print('Target expected X, Y based on GWCS: ', star_x, star_y)
 
     # If the source is not expected to be on the detector
     # e.g. in one of the two SW images that accompany the grismTS observation,
@@ -154,7 +161,7 @@ def check_pointing_target_star(filename, out_dir='./', threshold=50):
         sub_fwhm = 2.0
     plot_file = '{}_source_map.png'.format(os.path.basename(filename))
     plot_file = os.path.join(out_dir, plot_file)
-    found_sources = find_sources(model.data, threshold=threshold, fwhm=sub_fwhm, plot_name=plot_file)
+    found_sources = find_sources(model.data, threshold=threshold, fwhm=sub_fwhm, plot_name=plot_file, show_sources=True)
 
     print(found_sources['id', 'xcentroid', 'ycentroid', 'flux'])
 
@@ -256,7 +263,8 @@ def check_pointing_using_lmc_catalog(filename, out_dir='./', threshold=50):
     #cat_2mass = gaia[0]
 
     # Try LMC catalog from Jay Anderson
-    cat = ascii.read('lmc_astrometric_field_mirage.cat')
+    #cat = ascii.read('lmc_astrometric_field_mirage.cat')
+    cat = ascii.read('2MASS_catalog.txt')
     cat_2mass = Table()
     cat_2mass['ra'] = cat['x_or_RA']
     cat_2mass['dec'] = cat['y_or_Dec']
@@ -334,6 +342,162 @@ def check_pointing_using_lmc_catalog(filename, out_dir='./', threshold=50):
     #print(("Mean uncertainty in the source locations within the LMC catalog: {0:1.4f} = {1:1.2f} "
     #       "pixels\n\n".format(mean_unc, mean_unc_pix)))
     return med_dist, dev_dist, mean_unc, d2d_arcsec
+
+
+def check_pointing_using_2mass_catalog(filename, out_dir='./', threshold=50):
+    """Check that stars from an external LMC source catalog are present at the expected
+    locations within filename.
+
+    Parameters
+    ----------
+    filename : str
+        Name of fits file containing the observation to check. This file must
+        contain a valid GWCS (i.e. it must have gone through the assign_wcs
+        pipeline step.)
+
+    out_dir : str
+        Name of directory into which source catalogs are written
+
+    threshold : int
+        SNR threshold to use when finding sources
+
+    Returns
+    -------
+    med_dist : float
+        Median offset between expected and measured source locations, in arcsec
+
+    dev_dist : float
+        Standard deviation of the offset between expected and measured source
+        locations, in arcsec
+
+    mean_unc : float
+        Mean uncertainty in the source locoations in the 2MASS catalog, in arcsec
+
+    d2d_arcsec : list
+        Offsets between expected and measured source locations for all matched
+        sources, in arcsec
+    """
+    print("Working on: {}".format(os.path.basename(filename)))
+    model = ImageModel(filename)
+
+    detector = model.meta.instrument.detector
+    aperture = model.meta.subarray.name
+    if 'LONG' in detector:
+        detector = detector.replace('LONG', '5')
+    if 'GRISM256' not in aperture:
+        if aperture == 'SUB32TATS':
+            aperture = 'TAPSIMG32'
+        elif aperture == 'SUB32TATSGRISM':
+            aperture = 'TAGRISMTS_SCI_F322W2'
+        aperture_name = '{}_{}'.format(detector, aperture)
+    else:
+        if detector in ['NRCALONG', 'NRCA5']:
+            aperture_name = '{}_GRISM256_{}'.format(detector, 'F322W2')
+        else:
+            aperture_name = '{}_GRISMTS256'.format(detector)
+
+    #aperture_name = '{}_{}'.format(detector, aperture)
+    siaf = pysiaf.Siaf('nircam')[aperture_name]
+    pix_scale = siaf.XSciScale
+
+    # Read in catalog from 2MASS. We'll be using the positions in this
+    # catalog as "truth"
+    #catalog_2mass = os.path.join(os.path.dirname(__file__), 'car19_2MASS_source_catalog.txt')
+    #cat_2mass = ascii.read(catalog_2mass)
+    #ra_unc = cat_2mass['err_maj'] * u.arcsec
+    #dec_unc = cat_2mass['err_min'] * u.arcsec
+    #total_unc = np.sqrt(ra_unc**2 + dec_unc**2)
+
+    #pix2world = model.meta.wcs.get_transform('detector', 'world')
+    #ra, dec = pix2world(model.meta.subarray.xsize/2, model.meta.subarray.ysize/2)
+    #box_width = max(model.meta.subarray.xsize, model.meta.subarray.ysize) * model.meta.wcsinfo.cdelt1 * 3600 * 1.5
+    #print('RA, Dec, Box width', ra, dec, box_width)
+
+    # Try GAIA catalog instead
+    # Blah. Still no sources in some apertures
+    #gaia = query_GAIA_ptsrc_catalog(ra, dec, box_width)
+    #cat_2mass = gaia[0]
+
+    # Try LMC catalog from Jay Anderson
+    cat = ascii.read('2MASS_catalog.txt')
+    cat_2mass = Table()
+    cat_2mass['ra'] = cat['ra']
+    cat_2mass['dec'] = cat['dec']
+    ra_unc = cat['err_maj'] * u.arcsec  # No uncertainties in Jay's cat
+    dec_unc = cat['err_min'] * u.arcsec  # No uncertainties in Jay's cat
+    total_unc = np.sqrt(ra_unc**2 + dec_unc**2)
+
+    # Calculate the pixel corresponding to the RA, Dec value of the stars
+    # in the 2MASS catalog
+    world2det = model.meta.wcs.get_transform('world', 'detector')
+    star_x, star_y = world2det(cat_2mass['ra'], cat_2mass['dec'])
+    cat_2mass['x'] = star_x
+    cat_2mass['y'] = star_y
+
+    # Remove stars that are not on the detector
+    ydim, xdim = model.data.shape
+    good = ((star_x > 0) & (star_x < xdim) & (star_y > 0) & (star_y < ydim))
+    print('{} 2MASS sources should be present on the detector.'.format(np.sum(good)))
+
+    if np.sum(good) == 0:
+        print('Skipping.\n')
+        return None, None, None, None
+
+    cat_2mass = cat_2mass[good]
+
+    # Find sources in the data
+    if 'WL' not in model.meta.instrument.filter:
+        sub_fwhm = get_fwhm(model.meta.instrument.filter)
+    else:
+        # For weak lens data, set the FWHM to 2
+        sub_fwhm = 2.0
+    plot_file = '{}_source_map.png'.format(os.path.basename(filename))
+    plot_file = os.path.join(out_dir, plot_file)
+    sources = find_sources(model.data, threshold=threshold, fwhm=sub_fwhm, plot_name=plot_file)
+
+    # Calculate RA, Dec of the sources in the new catalog
+    det2world = model.meta.wcs.get_transform('detector', 'world')
+    found_ra, found_dec = det2world(sources['xcentroid'].data, sources['ycentroid'].data)
+    sources['calc_RA'] = found_ra
+    sources['calc_Dec'] = found_dec
+
+    # Match catalogs
+    found_sources = SkyCoord(ra=found_ra * u.degree, dec=found_dec * u.degree)
+    from_2mass = SkyCoord(ra=cat_2mass['ra'] * u.degree, dec=cat_2mass['dec'] * u.degree)
+    idx, d2d, d3d = found_sources.match_to_catalog_3d(from_2mass)
+
+    # Print table of sources
+    d2d_arcsec = d2d.to(u.arcsec).value
+    sources['x_of_matched_source'] = cat_2mass[idx]['x']
+    sources['y_of_matched_source'] = cat_2mass[idx]['y']
+    sources['ra_of_matched_source'] = cat_2mass[idx]['ra']
+    sources['dec_of_matched_source'] = cat_2mass[idx]['dec']
+    sources['delta_sky'] = d2d_arcsec
+    sources['delta_pix'] = d2d_arcsec / pix_scale
+
+    for colname in ['xcentroid', 'ycentroid', 'x_of_matched_source', 'y_of_matched_source', 'delta_pix']:
+        sources[colname].info.format = '7.3f'
+
+    print(sources['xcentroid', 'ycentroid', 'x_of_matched_source', 'y_of_matched_source', 'delta_pix'])
+
+    # Save the table of sources
+    table_file = 'comp_found_sources_to_LMC_{}.txt'.format(os.path.basename(filename))
+    table_file = os.path.join(out_dir, table_file)
+    print('Table of source location comparison saved to: {}'.format(table_file))
+    ascii.write(cat_2mass, table_file, overwrite=True)
+
+    # Get info on median offsets
+    med_dist = np.nanmedian(d2d_arcsec)
+    dev_dist = np.nanstd(d2d_arcsec)
+    print(("Median distance between sources in LMC catalog and those found in the "
+           "data: {0:1.4f} arcsec = {1:1.2f} pixels\n\n".format(med_dist, med_dist / pix_scale)))
+
+    mean_unc = np.mean(total_unc)
+    mean_unc_pix = np.mean(total_unc.value) / pix_scale
+    #print(("Mean uncertainty in the source locations within the LMC catalog: {0:1.4f} = {1:1.2f} "
+    #       "pixels\n\n".format(mean_unc, mean_unc_pix)))
+    return med_dist, dev_dist, mean_unc, d2d_arcsec
+
 
 
 def check_targ_ra_dec(hdu, expected_ra, expected_dec):
