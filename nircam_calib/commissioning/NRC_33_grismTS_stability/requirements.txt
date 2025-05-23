@@ -1,6 +1,6 @@
 argon2-cffi==20.1.0
 asdf==2.7.3
-astropy==4.2
+astropy==5.3.3
 async-generator==1.10
 attrs==20.3.0
 backcall==0.2.0
