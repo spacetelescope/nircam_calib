@@ -90,7 +90,7 @@ traitlets==5.0.5
 tshirt @ git+https://github.com/eas342/tshirt.git@eebecd429f1386b5b8d9a7c14108893bf940132b
 tweakwcs==0.7.3
 typing-extensions==4.0.0
-urllib3==1.26.5
+urllib3==1.26.19
 wcwidth==0.2.5
 webencodings==0.5.1
 widgetsnbextension==3.5.1
