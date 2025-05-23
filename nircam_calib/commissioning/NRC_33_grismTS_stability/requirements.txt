@@ -19,7 +19,7 @@ drizzle==1.13.1
 entrypoints==0.3
 filelock==3.0.12
 gwcs==0.16.1
-idna==2.10
+idna==3.7
 ipykernel==5.5.0
 ipython==7.31.1
 ipython-genutils==0.2.0
