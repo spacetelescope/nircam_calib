@@ -17,7 +17,7 @@ decorator==4.4.2
 defusedxml==0.7.1
 drizzle==1.13.1
 entrypoints==0.3
-filelock==3.0.12
+filelock==3.20.1
 gwcs==0.16.1
 idna==2.10
 ipykernel==5.5.0
