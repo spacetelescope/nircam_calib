@@ -113,7 +113,7 @@ def open_file(filename):
     """Open with datamodels and check that we have ramp data
     """
     model = datamodels.open(filename)
-    if not isinstance(model, datamodels.RampModel):
+    if not (isinstance(model, datamodels.RampModel) or isinstance(model, datamodels.Level1bModel)):
         raise ValueError("{} read in as {}. Expecting RampModel. Unable to continue.".format(filename, type(model)))
 
     return model
@@ -160,7 +160,7 @@ def sci_subarray_corners(instrument, aperture_name, siaf=None, verbose=False):
 
     # If multiuple apertures are listed as parents keep only the first
     if ';' in aperture._parent_apertures:
-        logger.info('Multiple parent apertures: {}'.format(aperture._parent_apertures))
+        print('Multiple parent apertures: {}'.format(aperture._parent_apertures))
         aperture._parent_apertures = aperture._parent_apertures.split(';')[0]
 
     if aperture_name in master_aperture_names:

@@ -10,7 +10,7 @@ from astropy.visualization.mpl_normalize import ImageNormalize
 import matplotlib.pyplot as plt
 import numpy as np
 from photutils import CircularAnnulus, CircularAperture, DAOStarFinder, \
-                      aperture_photometry, source_properties
+                      aperture_photometry
 from photutils.background import Background2D, MedianBackground
 from photutils.segmentation import detect_threshold, detect_sources, deblend_sources, SourceCatalog
 from photutils.utils import calc_total_error
@@ -95,7 +95,7 @@ def find_sources(data, threshold=30, fwhm=3.0, show_sources=True, save_sources=F
         Table of source positions
     """
     mean, median, std = sigma_clipped_stats(data, sigma=3.0)
-    daofind = DAOStarFinder(fwhm=fwhm, threshold=threshold*std)
+    daofind = DAOStarFinder(fwhm=fwhm, threshold=threshold*std, exclude_border=True)
     sources = daofind(data - median)
     if sources is not None:
         print('{} sources found.'.format(len(sources)))
