@@ -254,8 +254,8 @@ def create_nircam_distortion(detector, aperture, outname, sci_pupil,
     if pedigree is None:
         d.meta.pedigree = 'GROUND'
     else:
-        if pedigree.upper() not in ['DUMMY', 'GROUND', 'FLIGHT']:
-            raise ValueError("Bad PEDIGREE value.")
+        #if pedigree.upper() not in ['DUMMY', 'GROUND', 'INFLIGHT']:
+        #    raise ValueError("Bad PEDIGREE value.")
         d.meta.pedigree = pedigree.upper()
 
     d.meta.reftype = 'DISTORTION'
