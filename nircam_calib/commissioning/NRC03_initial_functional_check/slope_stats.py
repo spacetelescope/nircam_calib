@@ -15,7 +15,7 @@ from astropy.io import fits
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
-
+import os
 from jwst import datamodels
 
 
@@ -39,7 +39,7 @@ def detector_avg_and_median_per_integration(filename):
     """
     model = datamodels.open(filename)
 
-    nints = data.shape[0]
+    nints = model.data.shape[0]
     sci_medians = []
     ref_medians = []
     sci_means = []
@@ -51,26 +51,28 @@ def detector_avg_and_median_per_integration(filename):
     ref_clip_median = []
     ref_clip_dev = []
 
-    refpix = (model.dq & datamodels.dqflags.pixel['REFERENCE_PIXEL'] > 0)
-    scipix = (model.dq & datamodels.dqflags.pixel['REFERENCE_PIXEL'] == 0)
+    #refpix = (model.dq & datamodels.dqflags.pixel['REFERENCE_PIXEL'] > 0)
+    #scipix = (model.dq & datamodels.dqflags.pixel['REFERENCE_PIXEL'] == 0)
 
     for integ in range(nints):
-        dq = model.dq[integ, :, :]
-        data = model.data[integ, :, :]
-        refpix = (dq & datamodels.dqflags.pixel['REFERENCE_PIXEL'] > 0)
-        scipix = (dq & datamodels.dqflags.pixel['REFERENCE_PIXEL'] == 0)
+        dq = model.dq#[integ, :, :]
+        data = model.data#[integ, :, :]
+        refpix = (dq[integ,: ,:] & datamodels.dqflags.pixel['REFERENCE_PIXEL'] > 0)
+        scipix = (dq[integ,: ,:] & datamodels.dqflags.pixel['REFERENCE_PIXEL'] == 0)
 
-        sci_medians.append(np.median(data[scipix]))
-        ref_medians.append(np.median(data[refpix]))
-        sci_means.append(np.mean(data[scipix]))
-        ref_means.append(np.mean(data[refpix]))
+        frame = data[integ, :, :]
 
-        mn, med, stdev = sigma_clipped_stats(data[scipix], sigma=3)
+        sci_medians.append(np.nanmedian(frame[scipix]))
+        ref_medians.append(np.nanmedian(frame[refpix]))
+        sci_means.append(np.nanmean(frame[scipix]))
+        ref_means.append(np.nanmean(frame[refpix]))
+
+        mn, med, stdev = sigma_clipped_stats(frame[scipix], sigma=3)
         sci_clip_mean.append(mn)
         sci_clip_median.append(med)
         sci_clip_dev.append(stdev)
 
-        mn, med, stdev = sigma_clipped_stats(data[refpix], sigma=3)
+        mn, med, stdev = sigma_clipped_stats(frame[refpix], sigma=3)
         ref_clip_mean.append(mn)
         ref_clip_median.append(med)
         ref_clip_dev.append(stdev)
@@ -157,11 +159,17 @@ def create_histogram(filename):
 
     """
     data = fits.open(filename)
+    header = data[0].header
+    filtername = header['FILTER']
+    detector = header['DETECTOR']
+    subarr = header['SUBARRAY']
 
     in_dir, in_base = os.path.split(filename)
     outfile = os.path.join(in_dir, f'histogram_{in_base}.png')
 
-    if len(data.shape) == 2:
+    obs = int(in_base[7:10])
+
+    if len(data[1].data.shape) == 2:
         # rate file
         hist, bin_edges = np.histogram(data)
 
@@ -175,18 +183,43 @@ def create_histogram(filename):
         f.savefig(outfile)
         #plt.savefit(outfile)
 
-    elif len(data.shape) == 3:
+    elif len(data[1].data.shape) == 3:
         # rateints file
-        for integ in range(data.shape[0]):
-            hist, bin_edges = np.histogram(data[integ, :, :])
+        for integ in range(data[1].shape[0]):
+            integration = data[1].data[integ, :, :]
+            finite = np.isfinite(integration)
+            hist, bin_edges = np.histogram(integration[finite], bins=np.linspace(-10,30,400))
+
+
+            #print(bin_edges)
+            #print(hist)
             # convert bin edges to bin centers
             #bins = bin_edges[0:-1] + (bin_edges[1:] - bin_edges[0:-1]) / 2.
 
             # Plot
-            f, a = plt.subplots()
-            a.bar(bin_edges[:-1], hist, width=1)
+            """
+            f, a = plt.subplots(figsize=(8, 6))
+            a.bar(bin_edges[:-1], hist, color='blue', width=0.1)
+            a.set_xlim(-0.1, 4)
+            a.set_ylabel('Num. Pixels')
+            a.set_xlabel('Signal Rate (DN/sec)')
+            a.set_title(f'Obs 4 Signal Rates, {detector}, {filtername}, Integration {integ+1}')
 
-        save_multi_image(outfile)
+            outfile = os.path.join(in_dir, f'histogram_obs4_{detector}_{filtername}_integration{integ+1}.jpg')
+            #plt.show()
+            f.savefig(outfile)
+            plt.close()
+            """
+
+            n, bins, patches = plt.hist(integration[finite], bins=np.linspace(-0.1,4,41), alpha=0.25)
+            plt.ylabel('Num. Pixels')
+            plt.xlabel('Signal Rate (DN/sec)')
+            plt.title(f'Obs {obs} Signal Rates, {detector}, {subarr}, {filtername} per Integration')
+            plt.subplots_adjust(left=0.15)
+        outfile = os.path.join(in_dir, f'histogram_obs{obs}_{subarr}_{detector}_{filtername}.png')
+        plt.savefig(outfile)
+        plt.close()
+        #save_multi_image(outfile)
 
 def save_multi_image(filename):
     """Save multiple matplotlib plots to a single PDF
